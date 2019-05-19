@@ -7,7 +7,8 @@
 #include <cmath>
 
 #ifndef DISABLE_GUI
-#include <SDL2/SDL.h>
+//#include <SDL2/SDL.h>
+#include <SDL/SDL.h>
 #endif
 
 #include "interface.h"
@@ -82,13 +83,15 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
                 break;
             case SDL_MOUSEBUTTONDOWN:
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    SDL_WM_GrabInput(SDL_GRAB_ON);
+                    //SDL_SetRelativeMouseMode(SDL_TRUE);
                     camera_on = true;
                 }
                 break;
             case SDL_MOUSEBUTTONUP:
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                    SDL_WM_GrabInput(SDL_GRAB_OFF);
+                    //SDL_SetRelativeMouseMode(SDL_FALSE);
                     camera_on = false;
                 }
                 break;
@@ -115,7 +118,7 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
     return false;
 }
 
-static void update_texture(uint32_t* buf, SDL_Texture* texture, size_t width, size_t height, uint32_t iter) {
+static void update_texture(uint32_t* buf, SDL_Surface* target, size_t width, size_t height, uint32_t iter) {
     auto film = get_pixels();
     auto inv_iter = 1.0f / iter;
     auto inv_gamma = 1.0f / 2.2f;
@@ -131,7 +134,9 @@ static void update_texture(uint32_t* buf, SDL_Texture* texture, size_t width, si
                  uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);
         }
     }
-    SDL_UpdateTexture(texture, nullptr, buf, width * sizeof(uint32_t));
+    memcpy(target->pixels, buf, width * height * 4);
+    //target->pixels
+    //SDL_UpdateTexture(texture, nullptr, buf, width * sizeof(uint32_t));
 }
 #endif
 
@@ -239,7 +244,7 @@ int main(int argc, char** argv) {
         bench_iter = 1;
     }
 #else
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    /*if (SDL_Init(SDL_INIT_VIDEO) != 0)
         error("Cannot initialize SDL.");
 
     auto window = SDL_CreateWindow(
@@ -258,7 +263,11 @@ int main(int argc, char** argv) {
 
     auto texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
     if (!texture)
-        error("Cannot create texture");
+        error("Cannot create texture");*/
+    SDL_Surface *screen = NULL;
+
+    SDL_Init(SDL_INIT_VIDEO);
+    screen = SDL_SetVideoMode(width, height, 32, SDL_SWSURFACE);
 
     std::unique_ptr<uint32_t> buf(new uint32_t[width * height]);
 #endif
@@ -310,24 +319,27 @@ int main(int argc, char** argv) {
             std::ostringstream os;
             os << "Rodent [" << frames_sec << " FPS, "
                << iter * spp << " " << "sample" << (iter * spp > 1 ? "s" : "") << "]";
-            SDL_SetWindowTitle(window, os.str().c_str());
+            //SDL_SetWindowTitle(window, os.str().c_str());
+            SDL_WM_SetCaption(os.str().c_str(), NULL);
 #endif
             frames = 0;
             timing = 0;
         }
 
 #ifndef DISABLE_GUI
-        update_texture(buf.get(), texture, width, height, iter);
+        /*update_texture(buf.get(), texture, width, height, iter);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-        SDL_RenderPresent(renderer);
+        SDL_RenderPresent(renderer);*/
+        update_texture(buf.get(), screen, width, height, iter);
+        SDL_Flip(screen);
 #endif
     }
 
 #ifndef DISABLE_GUI
-    SDL_DestroyTexture(texture);
+    /*SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    SDL_DestroyWindow(window);*/
     SDL_Quit();
 #endif
 

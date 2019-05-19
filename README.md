@@ -2,6 +2,23 @@
 
 Rodent is a BVH traversal library and renderer implemented using the AnyDSL compiler framework (https://anydsl.github.io/).
 
+## Hugo's notes/changes:
+
+This is currently my work repo for the Real-time rendering seminar at Saarland University. This is a fork of [AnyDSL/rodent](https://github.com/AnyDSL/rodent).
+
+ * This uses SDL 1.2 instead of SDL2 to get arround LLVM conflicts when loading Mesa OpenGL drivers used by SDL2. SDL 1.2 still has pure software rendering support and thus can avoid loading mesa librairies to begin with.
+ * On my setup disabling OpenCL support in `runtime` was required to avoid conflicts with OpenCL ICDs ( same issue as above, two different dynamically linked versions of LLVM conflicting)
+
+### Other build notes
+
+Use (assuming your copy of rodent lives in the anydsl directory)
+
+`cmake .. -DCMAKE_PREFIX_PATH=../runtime/build/share/anydsl/cmake -DTARGET_PLATFORM=avx/amdgpu [-DTARGET_DEVICE=N]` 
+
+to generate 
+
+--- normal readme follows ---
+
 # Building
 
 The dependencies are: CMake, AnyDSL, libpng, SDL2, and optionally the Embree sources for the benchmarking tools.
