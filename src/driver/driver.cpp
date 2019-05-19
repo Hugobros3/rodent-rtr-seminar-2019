@@ -20,6 +20,8 @@
 #include <x86intrin.h>
 #endif
 
+#define EULER_ROTATION TRUE
+
 static constexpr float pi = 3.14159265359f;
 
 struct Camera {
@@ -28,6 +30,10 @@ struct Camera {
     float3 right;
     float3 up;
     float w, h;
+
+#ifdef EULER_ROTATION
+    float eulerYaw = 0, eulerPitch = 0;
+#endif
 
     Camera(const float3& e, const float3& d, const float3& u, float fov, float ratio) {
         eye = e;
@@ -40,11 +46,25 @@ struct Camera {
     }
 
     void rotate(float yaw, float pitch) {
+
+        eulerYaw += -yaw;
+        eulerPitch += -pitch;
+
+
+#ifdef EULER_ROTATION
+        dir = float3(sin(eulerYaw) * cos(eulerPitch), sin(eulerPitch), cos(eulerYaw) * cos(eulerPitch));
+        dir = normalize(dir);
+
+        up = float3(sin(eulerYaw) * cos(eulerPitch + pi / 2), sin(eulerPitch + pi / 2), cos(eulerYaw) * cos(eulerPitch + pi / 2));
+        up = normalize(up);
+        right = normalize(cross(dir, up));
+#else
         dir = ::rotate(dir, right,  -pitch);
         dir = ::rotate(dir, up,     -yaw);
         dir = normalize(dir);
         right = normalize(cross(dir, up));
         up = normalize(cross(right, dir));
+#endif
     }
 
     void move(float x, float y, float z) {
@@ -188,10 +208,12 @@ static inline void usage() {
 int main(int argc, char** argv) {
     std::string out_file;
     size_t bench_iter = 0;
-    size_t width  = 1080;
-    size_t height = 720;
+    //size_t width  = 1080;
+    size_t width  = 640;
+    //size_t height = 720;
+    size_t height = 480;
     float fov = 60.0f;
-    float3 eye(0.0f), dir(0.0f, 0.0f, 1.0f), up(0.0f, 1.0f, 0.0f);
+    float3 eye(0.0f, 0.1f, 0.0f), dir(0.0f, 0.0f, 1.0f), up(0.0f, 1.0f, 0.0f);
 
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
