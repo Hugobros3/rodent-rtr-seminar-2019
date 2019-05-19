@@ -39,3 +39,7 @@ src/driver/interface.h
 *.exe
 *.out
 *.app
+
+.idea/
+build/
+cmake-build-*/

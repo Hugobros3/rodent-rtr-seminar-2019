@@ -7,7 +7,11 @@
 #include <cmath>
 
 #ifndef DISABLE_GUI
-#include <SDL.h>
+	#ifdef PREFER_SDL2
+	#include <SDL2/SDL.h>
+	#else
+	#include <SDL/SDL.h>
+	#endif
 #endif
 
 #include "interface.h"
@@ -19,6 +23,8 @@
 #include <x86intrin.h>
 #endif
 
+#define EULER_ROTATION TRUE // for a more classical FPS camera
+
 static constexpr float pi = 3.14159265359f;
 
 struct Camera {
@@ -27,6 +33,10 @@ struct Camera {
     float3 right;
     float3 up;
     float w, h;
+
+#ifdef EULER_ROTATION
+    float eulerYaw = 0, eulerPitch = 0;
+#endif
 
     Camera(const float3& e, const float3& d, const float3& u, float fov, float ratio) {
         eye = e;
@@ -39,11 +49,22 @@ struct Camera {
     }
 
     void rotate(float yaw, float pitch) {
+        eulerYaw += -yaw;
+        eulerPitch += -pitch;
+#ifdef EULER_ROTATION
+        dir = float3(sin(eulerYaw) * cos(eulerPitch), sin(eulerPitch), cos(eulerYaw) * cos(eulerPitch));
+        dir = normalize(dir);
+
+        up = float3(sin(eulerYaw) * cos(eulerPitch + pi / 2), sin(eulerPitch + pi / 2), cos(eulerYaw) * cos(eulerPitch + pi / 2));
+        up = normalize(up);
+        right = normalize(cross(dir, up));
+#else
         dir = ::rotate(dir, right,  -pitch);
         dir = ::rotate(dir, up,     -yaw);
         dir = normalize(dir);
         right = normalize(cross(dir, up));
         up = normalize(cross(right, dir));
+#endif
     }
 
     void move(float x, float y, float z) {
@@ -82,13 +103,15 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
                 break;
             case SDL_MOUSEBUTTONDOWN:
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    SDL_WM_GrabInput(SDL_GRAB_ON);
+                    //SDL_SetRelativeMouseMode(SDL_TRUE);
                     camera_on = true;
                 }
                 break;
             case SDL_MOUSEBUTTONUP:
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                    SDL_WM_GrabInput(SDL_GRAB_OFF);
+                    //SDL_SetRelativeMouseMode(SDL_FALSE);
                     camera_on = false;
                 }
                 break;
@@ -115,7 +138,7 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
     return false;
 }
 
-static void update_texture(uint32_t* buf, SDL_Texture* texture, size_t width, size_t height, uint32_t iter) {
+static void update_texture(uint32_t* buf, SDL_Surface* target, size_t width, size_t height, uint32_t iter) {
     auto film = get_pixels();
     auto inv_iter = 1.0f / iter;
     auto inv_gamma = 1.0f / 2.2f;
@@ -131,7 +154,9 @@ static void update_texture(uint32_t* buf, SDL_Texture* texture, size_t width, si
                  uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);
         }
     }
-    SDL_UpdateTexture(texture, nullptr, buf, width * sizeof(uint32_t));
+    memcpy(target->pixels, buf, width * height * 4);
+    //target->pixels
+    //SDL_UpdateTexture(texture, nullptr, buf, width * sizeof(uint32_t));
 }
 #endif
 
@@ -186,7 +211,7 @@ int main(int argc, char** argv) {
     size_t width  = 1080;
     size_t height = 720;
     float fov = 60.0f;
-    float3 eye(0.0f), dir(0.0f, 0.0f, 1.0f), up(0.0f, 1.0f, 0.0f);
+    float3 eye(0.0f, 0.1f, 0.0f), dir(0.0f, 0.0f, 1.0f), up(0.0f, 1.0f, 0.0f);
 
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
@@ -239,6 +264,7 @@ int main(int argc, char** argv) {
         bench_iter = 1;
     }
 #else
+#ifdef PREFER_SDL2
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         error("Cannot initialize SDL.");
 
@@ -259,8 +285,14 @@ int main(int argc, char** argv) {
     auto texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
     if (!texture)
         error("Cannot create texture");
+#else
+    SDL_Surface *screen = NULL;
+
+    SDL_Init(SDL_INIT_VIDEO);
+    screen = SDL_SetVideoMode(width, height, 32, SDL_SWSURFACE);
 
     std::unique_ptr<uint32_t> buf(new uint32_t[width * height]);
+#endif
 #endif
 
     setup_interface(width, height);
@@ -310,25 +342,37 @@ int main(int argc, char** argv) {
             std::ostringstream os;
             os << "Rodent [" << frames_sec << " FPS, "
                << iter * spp << " " << "sample" << (iter * spp > 1 ? "s" : "") << "]";
+#ifdef PREFER_SDL2
             SDL_SetWindowTitle(window, os.str().c_str());
+#else
+            SDL_WM_SetCaption(os.str().c_str(), NULL);
+#endif
 #endif
             frames = 0;
             timing = 0;
         }
 
 #ifndef DISABLE_GUI
+#ifdef PREFER_SDL2
         update_texture(buf.get(), texture, width, height, iter);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, nullptr, nullptr);
         SDL_RenderPresent(renderer);
+#else
+        update_texture(buf.get(), screen, width, height, iter);
+#endif
+        SDL_Flip(screen);
 #endif
     }
 
 #ifndef DISABLE_GUI
+#ifdef PREFER_SDL2
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+#else
     SDL_Quit();
+#endif
 #endif
 
     if (out_file != "") {
