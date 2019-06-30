@@ -1,0 +1,72 @@
+//------------------------------------------------------------------------------------
+// Generated from 'cornell_box.obj' with the scene conversion tool
+//------------------------------------------------------------------------------------
+
+struct Settings {
+    eye: Vec3,
+    dir: Vec3,
+    up: Vec3,
+    right: Vec3,
+    width: f32,
+    height: f32
+};
+
+extern fn get_spp() -> i32 { 4 }
+
+extern fn render(settings: &Settings, iter: i32) -> () {
+    let device   = make_avx_device();
+    let renderer = make_debug_renderer();
+    let math     = device.intrinsics;
+
+    // Camera
+    let camera = make_perspective_camera(
+        math,
+        settings.eye,
+        make_mat3x3(settings.right, settings.up, settings.dir),
+        settings.width,
+        settings.height
+    );
+
+    // Triangle mesh
+    let vertices     = device.load_buffer("data/vertices.bin");
+    let normals      = device.load_buffer("data/normals.bin");
+    // let face_normals = device.load_buffer("data/face_normals.bin");
+    let indices      = device.load_buffer("data/indices.bin");
+
+    // let texcoords    = device.load_buffer("data/texcoords.bin");
+    let tri_mesh     = TriMesh {
+        vertices:     @ |i| vertices.load_vec3(i),
+        normals:      @ |i| normals.load_vec3(i),
+        face_normals: @ |i| make_vec3(0f, 0f, 0f),  //face_normals.load_vec3(i),
+        triangles:    @ |i| { let (i, j, k, _) = indices.load_int4(i); (i, j, k) },
+        attrs:        undef(), //@ |_| (false, @ |j| vec2_to_4(texcoords.load_vec2(j), 0.0f, 0.0f)),
+        num_attrs:    0,
+        num_tris:     0
+    };
+    let bvh = device.load_bvh("data/bvh.bin");
+
+    let shader_floor : Shader = @ |ray, hit, surf| {
+        let kd = make_color(0.725f, 0.71f, 0.68f);
+        let diffuse = make_diffuse_bsdf(math, surf, kd);
+        let bsdf = diffuse;
+        make_material(bsdf)
+    };
+
+    // Geometries
+    let geometries = @ |i| match i {
+        _ => make_tri_mesh_geometry(math, tri_mesh, shader_floor),
+    };
+
+    // Scene
+    let scene = Scene {
+        num_geometries: 4,
+        num_lights:     0,
+        geometries:     @ |i| geometries(i),
+        lights:         undef(),
+        camera:         camera,
+        bvh:            bvh
+    };
+
+    renderer(scene, device, iter);
+    device.present();
+}

@@ -71,7 +71,8 @@ anydsl_runtime_wrap(RODENT_OBJS
     NAME "rodent"
     CLANG_FLAGS ${CLANG_FLAGS}
     IMPALA_FLAGS --log-level info
-    FILES ${RODENT_SRCS} ${CMAKE_CURRENT_BINARY_DIR}/main.impala)
+    #FILES ${RODENT_SRCS} ${CMAKE_CURRENT_BINARY_DIR}/main.impala)
+    FILES ${RODENT_SRCS} custom_main.impala)
 
 anydsl_runtime_wrap(DISCARD_TMP_OBJS
     NAME "interface"
