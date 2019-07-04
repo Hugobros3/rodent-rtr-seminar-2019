@@ -6,9 +6,14 @@
 #include <chrono>
 #include <cmath>
 
+#define RUNTIME_ENABLE_JIT
+
+#include <anydsl_runtime.h>
+
 #ifndef DISABLE_GUI
 //#include <SDL2/SDL.h>
 #include <SDL/SDL.h>
+
 #endif
 
 #include "interface.h"
@@ -17,7 +22,9 @@
 #include "image.h"
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(_M_X64)
+
 #include <x86intrin.h>
+
 #endif
 
 #define EULER_ROTATION TRUE
@@ -35,7 +42,7 @@ struct Camera {
     float eulerYaw = 0, eulerPitch = 0;
 #endif
 
-    Camera(const float3& e, const float3& d, const float3& u, float fov, float ratio) {
+    Camera(const float3 &e, const float3 &d, const float3 &u, float fov, float ratio) {
         eye = e;
         dir = normalize(d);
         right = normalize(cross(dir, u));
@@ -55,7 +62,8 @@ struct Camera {
         dir = float3(sin(eulerYaw) * cos(eulerPitch), sin(eulerPitch), cos(eulerYaw) * cos(eulerPitch));
         dir = normalize(dir);
 
-        up = float3(sin(eulerYaw) * cos(eulerPitch + pi / 2), sin(eulerPitch + pi / 2), cos(eulerYaw) * cos(eulerPitch + pi / 2));
+        up = float3(sin(eulerYaw) * cos(eulerPitch + pi / 2), sin(eulerPitch + pi / 2),
+                    cos(eulerYaw) * cos(eulerPitch + pi / 2));
         up = normalize(up);
         right = normalize(cross(dir, up));
 #else
@@ -73,15 +81,19 @@ struct Camera {
 };
 
 void setup_interface(size_t, size_t);
-float* get_pixels();
+
+float *get_pixels();
+
 void clear_pixels();
+
 void cleanup_interface();
 
 #ifndef DISABLE_GUI
-static bool handle_events(uint32_t& iter, Camera& cam) {
+
+static bool handle_events(uint32_t &iter, Camera &cam) {
     static bool camera_on = false;
-    static bool arrows[4] = { false, false, false, false };
-    static bool speed[2] = { false, false };
+    static bool arrows[4] = {false, false, false, false};
+    static bool speed[2] = {false, false};
     const float rspeed = 0.005f;
     static float tspeed = 0.1f;
 
@@ -92,13 +104,26 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
             case SDL_KEYUP:
             case SDL_KEYDOWN:
                 switch (event.key.keysym.sym) {
-                    case SDLK_ESCAPE:   return true;
-                    case SDLK_KP_PLUS:  speed[0] = key_down; break;
-                    case SDLK_KP_MINUS: speed[1] = key_down; break;
-                    case SDLK_UP:       arrows[0] = key_down; break;
-                    case SDLK_DOWN:     arrows[1] = key_down; break;
-                    case SDLK_LEFT:     arrows[2] = key_down; break;
-                    case SDLK_RIGHT:    arrows[3] = key_down; break;
+                    case SDLK_ESCAPE:
+                        return true;
+                    case SDLK_KP_PLUS:
+                        speed[0] = key_down;
+                        break;
+                    case SDLK_KP_MINUS:
+                        speed[1] = key_down;
+                        break;
+                    case SDLK_UP:
+                        arrows[0] = key_down;
+                        break;
+                    case SDLK_DOWN:
+                        arrows[1] = key_down;
+                        break;
+                    case SDLK_LEFT:
+                        arrows[2] = key_down;
+                        break;
+                    case SDLK_RIGHT:
+                        arrows[3] = key_down;
+                        break;
                 }
                 break;
             case SDL_MOUSEBUTTONDOWN:
@@ -128,17 +153,17 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
         }
     }
 
-    if (arrows[0]) cam.move(0, 0,  tspeed);
+    if (arrows[0]) cam.move(0, 0, tspeed);
     if (arrows[1]) cam.move(0, 0, -tspeed);
     if (arrows[2]) cam.move(-tspeed, 0, 0);
-    if (arrows[3]) cam.move( tspeed, 0, 0);
+    if (arrows[3]) cam.move(tspeed, 0, 0);
     if (arrows[0] | arrows[1] | arrows[2] | arrows[3]) iter = 0;
     if (speed[0]) tspeed *= 1.1f;
     if (speed[1]) tspeed *= 0.9f;
     return false;
 }
 
-static void update_texture(uint32_t* buf, SDL_Surface* target, size_t width, size_t height, uint32_t iter) {
+static void update_texture(uint32_t *buf, SDL_Surface *target, size_t width, size_t height, uint32_t iter) {
     auto film = get_pixels();
     auto inv_iter = 1.0f / iter;
     auto inv_gamma = 1.0f / 2.2f;
@@ -149,18 +174,19 @@ static void update_texture(uint32_t* buf, SDL_Surface* target, size_t width, siz
             auto b = film[(y * width + x) * 3 + 2];
 
             buf[y * width + x] =
-                (uint32_t(clamp(std::pow(r * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f) << 16) |
-                (uint32_t(clamp(std::pow(g * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f) << 8)  |
-                 uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);
+                    (uint32_t(clamp(std::pow(r * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f) << 16) |
+                    (uint32_t(clamp(std::pow(g * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f) << 8) |
+                    uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);
         }
     }
     memcpy(target->pixels, buf, width * height * 4);
     //target->pixels
     //SDL_UpdateTexture(texture, nullptr, buf, width * sizeof(uint32_t));
 }
+
 #endif
 
-static void save_image(const std::string& out_file, size_t width, size_t height, uint32_t iter) {
+static void save_image(const std::string &out_file, size_t width, size_t height, uint32_t iter) {
     ImageRgba32 img;
     img.width = width;
     img.height = height;
@@ -186,7 +212,7 @@ static void save_image(const std::string& out_file, size_t width, size_t height,
         error("Failed to save PNG file '", out_file, "'");
 }
 
-static inline void check_arg(int argc, char** argv, int arg, int n) {
+static inline void check_arg(int argc, char **argv, int arg, int n) {
     if (arg + n >= argc)
         error("Option '", argv[arg], "' expects ", n, " arguments, got ", argc - arg);
 }
@@ -205,11 +231,11 @@ static inline void usage() {
               << "   -o       image.png  Writes the output image to a file" << std::endl;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     std::string out_file;
     size_t bench_iter = 0;
     //size_t width  = 1080;
-    size_t width  = 640;
+    size_t width = 640;
     //size_t height = 720;
     size_t height = 480;
     float fov = 60.0f;
@@ -257,7 +283,7 @@ int main(int argc, char** argv) {
         }
         error("Unexpected argument '", argv[i], "'");
     }
-    Camera cam(eye, dir, up, fov, (float)width / (float)height);
+    Camera cam(eye, dir, up, fov, (float) width / (float) height);
 
 #ifdef DISABLE_GUI
     info("Running in console-only mode (compiled with -DDISABLE_GUI).");
@@ -301,6 +327,32 @@ int main(int argc, char** argv) {
     _mm_setcsr(_mm_getcsr() | (_MM_FLUSH_ZERO_ON | _MM_DENORMALS_ZERO_ON));
 #endif
 
+    std::string jit_code = "struct Vec3 {\n"
+                           "    x: f32,\n"
+                           "    y: f32,\n"
+                           "    z: f32\n"
+                           "}"
+                           ""
+                           "struct Settings {\n"
+                           "    eye: Vec3,\n"
+                           "    dir: Vec3,\n"
+                           "    up: Vec3,\n"
+                           "    right: Vec3,\n"
+                           "    width: f32,\n"
+                           "    height: f32\n"
+                           "}\n"
+                           ""
+                           "extern fn render_via_jit(settings: &Settings, iter: i32) -> () {"
+                           "    render(settings, iter);"
+                           "}";
+
+    anydsl_link("lib/librodent_lib.so");
+    //anydsl_link("/home/hugo/git/anydsl2/rodent/build/lib/librodent_lib.so");
+    //anydsl_link("librodent_lib.so");
+    auto cpld = anydsl_compile(jit_code.c_str(), jit_code.size(), 3);
+    typedef void(* render_fn)(struct Settings const* settings, int iter);
+    render_fn obtained = reinterpret_cast<render_fn >(anydsl_lookup_function(cpld, "render_via_jit"));
+
     auto spp = get_spp();
     bool done = false;
     uint64_t timing = 0;
@@ -314,18 +366,20 @@ int main(int argc, char** argv) {
         if (iter == 0)
             clear_pixels();
 
-        Settings settings {
-            Vec3 { cam.eye.x, cam.eye.y, cam.eye.z },
-            Vec3 { cam.dir.x, cam.dir.y, cam.dir.z },
-            Vec3 { cam.up.x, cam.up.y, cam.up.z },
-            Vec3 { cam.right.x, cam.right.y, cam.right.z },
-            cam.w,
-            cam.h
+        Settings settings{
+                Vec3{cam.eye.x, cam.eye.y, cam.eye.z},
+                Vec3{cam.dir.x, cam.dir.y, cam.dir.z},
+                Vec3{cam.up.x, cam.up.y, cam.up.z},
+                Vec3{cam.right.x, cam.right.y, cam.right.z},
+                cam.w,
+                cam.h
         };
 
         auto ticks = std::chrono::high_resolution_clock::now();
-        render(&settings, iter++);
-        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - ticks).count();
+        obtained(&settings, iter++);
+        //render(&settings, iter++);
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::high_resolution_clock::now() - ticks).count();
 
         if (bench_iter != 0) {
             samples_sec.emplace_back(1000.0 * double(spp * width * height) / double(elapsed_ms));

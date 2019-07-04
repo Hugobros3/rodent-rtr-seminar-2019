@@ -11,11 +11,13 @@ struct Settings {
     height: f32
 };
 
-extern fn get_spp() -> i32 { 4 }
+extern fn get_spp() -> i32 { 1 }
 
 extern fn render(settings: &Settings, iter: i32) -> () {
     let device   = make_avx_device();
-    let renderer = make_debug_renderer();
+
+    let renderer = make_path_tracing_renderer(64, 1);
+    //let renderer = make_debug_renderer();
     let math     = device.intrinsics;
 
     // Camera
@@ -30,14 +32,14 @@ extern fn render(settings: &Settings, iter: i32) -> () {
     // Triangle mesh
     let vertices     = device.load_buffer("data/vertices.bin");
     let normals      = device.load_buffer("data/normals.bin");
-    // let face_normals = device.load_buffer("data/face_normals.bin");
+    let face_normals = device.load_buffer("data/face_normals.bin");
     let indices      = device.load_buffer("data/indices.bin");
 
     // let texcoords    = device.load_buffer("data/texcoords.bin");
     let tri_mesh     = TriMesh {
         vertices:     @ |i| vertices.load_vec3(i),
         normals:      @ |i| normals.load_vec3(i),
-        face_normals: @ |i| make_vec3(0f, 0f, 0f),  //face_normals.load_vec3(i),
+        face_normals: @ |i| face_normals.load_vec3(i),
         triangles:    @ |i| { let (i, j, k, _) = indices.load_int4(i); (i, j, k) },
         attrs:        undef(), //@ |_| (false, @ |j| vec2_to_4(texcoords.load_vec2(j), 0.0f, 0.0f)),
         num_attrs:    0,
@@ -57,12 +59,16 @@ extern fn render(settings: &Settings, iter: i32) -> () {
         _ => make_tri_mesh_geometry(math, tri_mesh, shader_floor),
     };
 
+    let lights = @ | i | {
+        make_point_light(math, make_vec3(0.31f, 5.19f, -0.56f), make_color(/*the_answer() as f32*/30f, 0f, 0f))
+    };
+
     // Scene
     let scene = Scene {
-        num_geometries: 4,
-        num_lights:     0,
+        num_geometries: 25,
+        num_lights:     1,
         geometries:     @ |i| geometries(i),
-        lights:         undef(),
+        lights:         @ |i| lights(i),
         camera:         camera,
         bvh:            bvh
     };

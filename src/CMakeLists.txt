@@ -74,6 +74,8 @@ anydsl_runtime_wrap(RODENT_OBJS
     #FILES ${RODENT_SRCS} ${CMAKE_CURRENT_BINARY_DIR}/main.impala)
     FILES ${RODENT_SRCS} custom_main.impala)
 
+add_library(rodent_lib SHARED rodent.o)
+
 anydsl_runtime_wrap(DISCARD_TMP_OBJS
     NAME "interface"
     FILES ${RODENT_SRCS} dummy_main.impala
@@ -129,4 +131,4 @@ if (COLORIZE)
 endif()
 
 add_executable(rodent ${RODENT_OBJS})
-target_link_libraries(rodent driver ${AnyDSL_runtime_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES} ${TBB_LIBRARIES} ${LZ4_LIBRARY})
+target_link_libraries(rodent driver ${AnyDSL_runtime_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES} ${TBB_LIBRARIES} ${LZ4_LIBRARY} bvh)
