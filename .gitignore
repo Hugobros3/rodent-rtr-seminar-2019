@@ -43,3 +43,4 @@ src/driver/interface.h
 .idea/
 build/
 cmake-build-*/
+src/converter/interface.h

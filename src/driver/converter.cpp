@@ -12,6 +12,7 @@
 #include "interface.h"
 #include "obj.h"
 #include "buffer.h"
+#include "../converter/interface.h"
 
 #ifdef WIN32
 #include <direct.h>
@@ -423,6 +424,15 @@ static void build_bvh(const obj::TriMesh& tri_mesh,
         in_tris[i] = Tri(v0, v1, v2);
     }
     adapter.build(tri_mesh, in_tris);
+
+}
+
+template<>
+ void build_bvh<8,4>(const obj::TriMesh& tri_mesh,
+                      std::vector<typename BvhNTriM<8, 4>::Node>& nodes,
+                      std::vector<typename BvhNTriM<8, 4>::Tri>& tris) {
+    std::cout << "we explicitely override bvh building for 8,4\n";
+    //make_bvh8()
 }
 
 template <typename Node, typename Tri>

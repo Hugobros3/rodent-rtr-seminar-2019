@@ -1,0 +1,34 @@
+struct ConverterInputTriMesh {
+    tri_count: i32,
+    indices: &[i32],
+    vertices: &[f32],
+    //normals: &[f32],
+    //face_normals: &[f32],
+    //texcoords: &[f32],
+}
+
+struct Tri4 {
+    v0: [[f32 * 4] * 3],
+    e1: [[f32 * 4] * 3],
+    e2: [[f32 * 4] * 3],
+    n:  [[f32 * 4] * 3],
+    prim_id: [i32 * 4],
+    geom_id: [i32 * 4]
+}
+
+struct Node4 {
+    bounds: [[f32 * 4] * 6],
+    child:   [i32 * 4],
+    pad:     [i32 * 4]
+}
+
+struct Node8 {
+    bounds: [[f32 * 8] * 6],
+    child:   [i32 * 8],
+    pad:     [i32 * 8]
+}
+
+extern fn make_bvh8(input_data: ConverterInputTriMesh) -> BBox {
+    error_abort("hello world");
+    make_bbox_default()
+}
