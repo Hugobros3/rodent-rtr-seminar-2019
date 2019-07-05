@@ -60,7 +60,7 @@ set(DRIVER_SRCS
         driver/color.h)
 
 set(CONVERTER_SRCS
-        converter/interface.h
+        converter/converter_interface.h
         driver/converter.cpp
         driver/obj.cpp
         driver/obj.h
@@ -90,7 +90,7 @@ anydsl_runtime_wrap(CONVERTER_OBJS
         CLANG_FLAGS ${CLANG_FLAGS}
         IMPALA_FLAGS --log-level info
         FILES ${BVH_BUILDER_LIBRARY_IMPALA_FILES} ${CONVERTER_IMPALA_SRCS}
-        INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/converter/interface
+        #INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/converter/converter_interface
         )
 
 message("${BVH_BUILDER_LIBRARY_IMPALA_FILES} ")
@@ -109,7 +109,7 @@ find_package(LZ4 REQUIRED)
 
 add_executable(converter ${CONVERTER_SRCS} ${CONVERTER_OBJS})
 target_include_directories(converter PUBLIC ${LZ4_INCLUDE_DIR})
-target_link_libraries(converter ${LZ4_LIBRARY} bvh_debug)
+target_link_libraries(converter ${LZ4_LIBRARY} bvh_debug ${AnyDSL_runtime_LIBRARIES})
 target_compile_definitions(converter PUBLIC -DCPUINFO_PATH="${CPUINFO_PATH}")
 if (COLORIZE)
     target_compile_definitions(converter PUBLIC -DCOLORIZE)

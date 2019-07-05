@@ -1,12 +1,20 @@
 struct ConverterInputTriMesh {
     tri_count: i32,
-    indices: &[i32],
+    indices: &[i32], // Should be a Buffer eventually (to support non-cpu devices)
     vertices: &[f32],
     //normals: &[f32],
     //face_normals: &[f32],
     //texcoords: &[f32],
 }
 
+struct OutputNode8Tri4 {
+    nodes_count: i32,
+    nodes: &[Node8],
+    tris_count: i32,
+    tris: &[Tri4],
+}
+
+// todo reorganize impala files so these definitions aren't duplicated
 struct Tri4 {
     v0: [[f32 * 4] * 3],
     e1: [[f32 * 4] * 3],
@@ -28,7 +36,140 @@ struct Node8 {
     pad:     [i32 * 8]
 }
 
-extern fn make_bvh8(input_data: ConverterInputTriMesh) -> BBox {
-    error_abort("hello world");
-    make_bbox_default()
+struct Tri {
+    v0: Vec3,
+    v1: Vec3,
+    v2: Vec3,
+}
+
+extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
+    let nodes_buffer = alloc_cpu(sizeof[Node8]() * 1024);
+    let tris_buffer = alloc_cpu(sizeof[Tri4]() * 1024);
+
+    let nodes = nodes_buffer.data as &mut[Node8];
+    let tris = tris_buffer.data as &mut[Tri4];
+
+    let mut nodes_count = 0;
+    let mut tris_count = 0;
+
+    fn @load_indices(i: i32) -> (i32, i32, i32, i32) {
+        let o = i * 4;
+        let i = input_data.indices(o + 0);
+        let j = input_data.indices(o + 1);
+        let k = input_data.indices(o + 2);
+        let m = input_data.indices(o + 3);
+        (i, j, k, m)
+    }
+
+    fn @load_vertex(i: i32) -> Vec3 {
+        make_vec3 (
+            input_data.vertices(i * 3 + 0),
+            input_data.vertices(i * 3 + 1),
+            input_data.vertices(i * 3 + 2),
+        )
+    }
+
+    fn @load_tri(i: i32) -> Tri {
+        let (i0, i1, i2, _) = load_indices(i);
+        Tri {
+            v0: load_vertex(i0),
+            v1: load_vertex(i1),
+            v2: load_vertex(i2),
+        }
+    }
+
+    fn @tri_bbox(tri: Tri) -> BBox {
+        let min = vec3_min(tri.v0, vec3_min(tri.v1, tri.v2));
+        let max = vec3_max(tri.v0, vec3_max(tri.v1, tri.v2));
+        make_bbox(min, max)
+    }
+
+    fn @tri_center(tri: Tri) -> Vec3 {
+        vec3_mulf(vec3_add(tri.v0, vec3_add(tri.v1, tri.v2)), 0.3333333f)
+    }
+
+    let input = Input {
+        primitives_count: input_data.tri_count,
+        bboxes: @ | i | { @@tri_bbox(load_tri(i)) },
+        centers: @ | i | { @@tri_center(load_tri(i)) },
+    };
+
+    let output_writer = OutputWriter {
+        arity: 8,
+        max_primitive_packet_size: 4,
+
+        write_inner_node: | bbox, child_count, children_ids, children_bboxes | {
+            let node_id = nodes_count++;
+
+            fn @select_bbox_component(c: i32, bbox: BBox) -> f32 {
+                match(c) {
+                    0 => bbox.min.x,
+                    2 => bbox.min.y,
+                    4 => bbox.min.z,
+                    1 => bbox.max.x,
+                    3 => bbox.max.y,
+                    5 => bbox.max.z,
+                    _ => -1f,
+                }
+            }
+            fn @bbox_component_or_minus_zero(c: i32, i: i32) -> f32 { if i >= child_count { 0f } else { select_bbox_component(c, children_bboxes(i)) }}
+            fn @make_bbox_component(c: i32) -> [f32 * 8] {
+                [bbox_component_or_minus_zero(c, 0), bbox_component_or_minus_zero(c, 1), bbox_component_or_minus_zero(c, 2), bbox_component_or_minus_zero(c, 3)
+                ,bbox_component_or_minus_zero(c, 4), bbox_component_or_minus_zero(c, 5), bbox_component_or_minus_zero(c, 6), bbox_component_or_minus_zero(c, 7)]
+            }
+            fn @child_id_or_minus_one(i: i32) -> i32 { if i >= child_count { -1 } else { children_ids(i) }}
+
+            nodes(node_id) = Node8 {
+                bounds: [make_bbox_component(0), make_bbox_component(1), make_bbox_component(2), make_bbox_component(3), make_bbox_component(4), make_bbox_component(5)],
+                child: [
+                    child_id_or_minus_one(0),
+                    child_id_or_minus_one(1),
+                    child_id_or_minus_one(2),
+                    child_id_or_minus_one(3),
+                    child_id_or_minus_one(4),
+                    child_id_or_minus_one(5),
+                    child_id_or_minus_one(6),
+                    child_id_or_minus_one(7),
+                ],
+                pad: [0, 0, 0, 0, 0, 0, 0, 0],
+            };
+
+            node_id + 1
+        },
+        write_leaf_node: | bbox, prim_offset, prim_count| {
+            let base_primitive_id = tris_count;
+
+            let tri = load_tri(prim_offset);
+            let v0 = tri.v0;
+            let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
+            let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
+            let n = vec3_cross(e1, e2);
+
+            let (_, _, _, m) = load_indices(prim_offset);
+
+            // todo actually loop & write all the primitives
+            // (works for now because the LBVH builder outputs only 1 primitive/node and doesn't try to merge anything )
+            tris(base_primitive_id) = Tri4 {
+                v0: [[v0.x, 0f, 0f, 0f], [v0.y, 0f, 0f, 0f], [v0.z, 0f, 0f, 0f]],
+                e1: [[e1.x, 0f, 0f, 0f], [e1.y, 0f, 0f, 0f], [e1.z, 0f, 0f, 0f]],
+                e2: [[e2.x, 0f, 0f, 0f], [e2.y, 0f, 0f, 0f], [e2.z, 0f, 0f, 0f]],
+                n:  [[n.x , 0f, 0f, 0f], [n.y , 0f, 0f, 0f], [n.z , 0f, 0f, 0f]],
+                prim_id: [prim_offset, -1, -1, -1],
+                geom_id: [m, -1, -1, -1],
+            };
+
+            tris_count++;
+
+            base_primitive_id ^ bitcast[i32](0xFFFFFFFFu32)
+        },
+    };
+
+    build_bvh(input, output_writer);
+
+    OutputNode8Tri4 {
+        nodes_count: nodes_count,
+        nodes: nodes,
+        tris_count: tris_count,
+        tris: tris,
+    }
 }
