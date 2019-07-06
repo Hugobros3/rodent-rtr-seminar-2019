@@ -14,12 +14,13 @@ struct OutputNode8Tri4 {
 };
 
 struct ConverterInputTriMesh {
-    int tri_count;
     int const* indices;
+    int tri_count;
     float const* vertices;
 };
 
-struct OutputNode8Tri4 make_bvh8_4(struct ConverterInputTriMesh input_data);
+//struct OutputNode8Tri4 make_bvh8_4(struct ConverterInputTriMesh input_data);
+struct OutputNode8Tri4 make_bvh8_4(int vertices_count, int const* indices, float const* vertices);
 
 #ifdef __cplusplus
 }

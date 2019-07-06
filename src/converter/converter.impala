@@ -1,10 +1,7 @@
 struct ConverterInputTriMesh {
-    tri_count: i32,
     indices: &[i32], // Should be a Buffer eventually (to support non-cpu devices)
+    tri_count: i32,
     vertices: &[f32],
-    //normals: &[f32],
-    //face_normals: &[f32],
-    //texcoords: &[f32],
 }
 
 struct OutputNode8Tri4 {
@@ -42,19 +39,21 @@ struct Tri {
     v2: Vec3,
 }
 
-extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
-    let nodes_buffer = alloc_cpu(sizeof[Node8]() * 1024);
-    let tris_buffer = alloc_cpu(sizeof[Tri4]() * 1024);
+//extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
 
-    let nodes = nodes_buffer.data as &mut[Node8];
-    let tris = tris_buffer.data as &mut[Tri4];
+extern fn make_bvh8_4(pc: i32, i: &[i32], f: &[f32]) -> OutputNode8Tri4 {
 
-    let mut nodes_count = 0;
-    let mut tris_count = 0;
+    let input_data = ConverterInputTriMesh {
+        indices: i,
+        tri_count: pc,
+        vertices: f
+    };
 
-    fn @load_indices(i: i32) -> (i32, i32, i32, i32) {
-        let o = i * 4;
+    fn @load_indices(t: i32) -> (i32, i32, i32, i32) {
+        let o = t * 4;
+        print_value(o, "tri");
         let i = input_data.indices(o + 0);
+        print_value(i, "i");
         let j = input_data.indices(o + 1);
         let k = input_data.indices(o + 2);
         let m = input_data.indices(o + 3);
@@ -62,6 +61,8 @@ extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
     }
 
     fn @load_vertex(i: i32) -> Vec3 {
+        print_value(i, "indice");
+        //print_value(input_data.vertices(i * 3 + 0), "x");
         make_vec3 (
             input_data.vertices(i * 3 + 0),
             input_data.vertices(i * 3 + 1),
@@ -94,12 +95,22 @@ extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
         centers: @ | i | { @@tri_center(load_tri(i)) },
     };
 
+    let nodes_buffer = alloc_cpu(sizeof[Node8]() * 1024);
+    let tris_buffer = alloc_cpu(sizeof[Tri4]() * 1024);
+
+    let nodes = nodes_buffer.data as &mut[Node8];
+    let tris = tris_buffer.data as &mut[Tri4];
+
+    let mut nodes_count = 0;
+    let mut tris_count = 0;
+
     let output_writer = OutputWriter {
         arity: 8,
         max_primitive_packet_size: 4,
 
         write_inner_node: | bbox, child_count, children_ids, children_bboxes | {
-            let node_id = nodes_count++;
+            0
+            /*let node_id = nodes_count++;
 
             fn @select_bbox_component(c: i32, bbox: BBox) -> f32 {
                 match(c) {
@@ -134,10 +145,11 @@ extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
                 pad: [0, 0, 0, 0, 0, 0, 0, 0],
             };
 
-            node_id + 1
+            node_id + 1*/
         },
         write_leaf_node: | bbox, prim_offset, prim_count| {
-            let base_primitive_id = tris_count;
+            0
+            /*let base_primitive_id = tris_count;
 
             let tri = load_tri(prim_offset);
             let v0 = tri.v0;
@@ -149,6 +161,7 @@ extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
 
             // todo actually loop & write all the primitives
             // (works for now because the LBVH builder outputs only 1 primitive/node and doesn't try to merge anything )
+
             tris(base_primitive_id) = Tri4 {
                 v0: [[v0.x, 0f, 0f, 0f], [v0.y, 0f, 0f, 0f], [v0.z, 0f, 0f, 0f]],
                 e1: [[e1.x, 0f, 0f, 0f], [e1.y, 0f, 0f, 0f], [e1.z, 0f, 0f, 0f]],
@@ -160,7 +173,7 @@ extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
 
             tris_count++;
 
-            base_primitive_id ^ bitcast[i32](0xFFFFFFFFu32)
+            base_primitive_id ^ bitcast[i32](0xFFFFFFFFu32)*/
         },
     };
 

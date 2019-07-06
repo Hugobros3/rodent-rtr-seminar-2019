@@ -22,6 +22,7 @@
 #else
 
 #include <sys/stat.h>
+#include <anydsl_runtime.h>
 
 #define create_directory(d) { umask(0); mkdir(d, 0777); }
 #endif
@@ -431,13 +432,23 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
 
     std::cout << "we explicitely override bvh building for 8,4\n";
 
+    auto indices = anydsl_aligned_malloc(tri_mesh.indices.size() * sizeof(int32_t), 64);
+    memcpy(indices, tri_mesh.indices.data(), tri_mesh.indices.size() * sizeof(int32_t));
+
+    auto vertices = anydsl_aligned_malloc(tri_mesh.vertices.size() * sizeof(float3), 64);
+    memcpy(vertices, tri_mesh.vertices.data(), tri_mesh.vertices.size() * sizeof(float3));
+
     auto builder_input = ConverterInputTriMesh{
+            reinterpret_cast<int*>(const_cast<uint32_t *>(tri_mesh.indices.data())),
+            //reinterpret_cast<int*>(indices),
+            //reinterpret_cast<float*>(vertices),
             (int) tri_mesh.indices.size() / 4,
-            (const int*)tri_mesh.indices.data(),
-            (const float*)tri_mesh.vertices.data(),
+            reinterpret_cast<float*>(const_cast<float3*>(tri_mesh.vertices.data())),
+
     };
 
-    auto bvh8 = make_bvh8_4(builder_input);
+    //auto bvh8 = make_bvh8_4(builder_input);
+    auto bvh8 = make_bvh8_4(builder_input.tri_count, builder_input.indices, builder_input.vertices);
     auto built_nodes = bvh8.nodes;
     auto built_tris = bvh8.tris;
 
