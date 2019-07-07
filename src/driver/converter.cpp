@@ -707,8 +707,9 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
             break;
     }
 
-    os << "    let renderer = make_path_tracing_renderer(" << max_path_len << " /*max_path_len*/, " << spp
-       << " /*spp*/);\n"
+    //os << "    let renderer = make_path_tracing_renderer(" << max_path_len << " /*max_path_len*/, " << spp
+    //<< " /*spp*/);\n"
+    os << "    let renderer = make_debug_renderer();"
        << "    let math     = device.intrinsics;\n";
 
     // Setup camera

@@ -94,8 +94,9 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
         centers: @ | i | { @@tri_center(load_tri(i)) },
     };
 
-    let nodes_buffer = alloc_cpu(sizeof[Node8]() * 1024);
-    let tris_buffer = alloc_cpu(sizeof[Tri4]() * 1024);
+    //todo some good heuristic for sizing those
+    let nodes_buffer = alloc_cpu(sizeof[Node8]() * 655360);
+    let tris_buffer = alloc_cpu(sizeof[Tri4]() * 655360);
 
     let nodes = nodes_buffer.data as &mut[Node8];
     let tris = tris_buffer.data as &mut[Tri4];
@@ -108,7 +109,7 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
     let output_writer = OutputWriter {
         arity: 8,
 
-        write_inner_node: | node_id, bbox, child_count, children_ids, children_bboxes | {
+        write_inner_node: @ | node_id, bbox, child_count, children_ids, children_bboxes | {
             nodes_count++;
 
             fn @select_bbox_component(c: i32, bbox: &BBox) -> f32 {
@@ -128,9 +129,6 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                 for i in range(0, 8) {
                     data(i) = bbox_component_or_minus_zero(c, i);
                 }
-
-                //[bbox_component_or_minus_zero(c, 0), bbox_component_or_minus_zero(c, 1), bbox_component_or_minus_zero(c, 2), bbox_component_or_minus_zero(c, 3)
-                //,bbox_component_or_minus_zero(c, 4), bbox_component_or_minus_zero(c, 5), bbox_component_or_minus_zero(c, 6), bbox_component_or_minus_zero(c, 7)]
             }
 
             for i in range(0, 6) {
@@ -147,8 +145,6 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
         write_leaf_node: @ | bbox, prim_offset, prim_count| {
             let base_primitive_id = tris_count;
 
-            print_value(prim_offset, "eeee");
-
             let mut t = prim_offset;
             let end = prim_offset + prim_count;
 
@@ -164,7 +160,6 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                 }
 
                 for i in range(0, packet_size) {
-                    print_value(i, "triangle i");
                     let tri = load_tri(t);
                     let v0 = tri.v0;
                     let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
