@@ -39,21 +39,22 @@ struct Tri {
     v2: Vec3,
 }
 
-//extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
+// seems like there is a glitch when two array pointers exist in the same struct, I just end up reading garbage when I use ConverterInputTriMesh
+// unless I remove one array pointer field then it works fine.
 
-extern fn make_bvh8_4(pc: i32, i: &[i32], f: &[f32]) -> OutputNode8Tri4 {
+// extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
+
+extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
 
     let input_data = ConverterInputTriMesh {
-        indices: i,
+        indices: ind,
         tri_count: pc,
-        vertices: f
+        vertices: vd,
     };
 
     fn @load_indices(t: i32) -> (i32, i32, i32, i32) {
         let o = t * 4;
-        print_value(o, "tri");
         let i = input_data.indices(o + 0);
-        print_value(i, "i");
         let j = input_data.indices(o + 1);
         let k = input_data.indices(o + 2);
         let m = input_data.indices(o + 3);
@@ -61,8 +62,6 @@ extern fn make_bvh8_4(pc: i32, i: &[i32], f: &[f32]) -> OutputNode8Tri4 {
     }
 
     fn @load_vertex(i: i32) -> Vec3 {
-        print_value(i, "indice");
-        //print_value(input_data.vertices(i * 3 + 0), "x");
         make_vec3 (
             input_data.vertices(i * 3 + 0),
             input_data.vertices(i * 3 + 1),
@@ -90,7 +89,7 @@ extern fn make_bvh8_4(pc: i32, i: &[i32], f: &[f32]) -> OutputNode8Tri4 {
     }
 
     let input = Input {
-        primitives_count: input_data.tri_count,
+        primitives_count: pc,
         bboxes: @ | i | { @@tri_bbox(load_tri(i)) },
         centers: @ | i | { @@tri_center(load_tri(i)) },
     };
@@ -104,15 +103,15 @@ extern fn make_bvh8_4(pc: i32, i: &[i32], f: &[f32]) -> OutputNode8Tri4 {
     let mut nodes_count = 0;
     let mut tris_count = 0;
 
+    let max_primitive_packet_size = 4;
+
     let output_writer = OutputWriter {
         arity: 8,
-        max_primitive_packet_size: 4,
 
-        write_inner_node: | bbox, child_count, children_ids, children_bboxes | {
-            0
-            /*let node_id = nodes_count++;
+        write_inner_node: | node_id, bbox, child_count, children_ids, children_bboxes | {
+            nodes_count++;
 
-            fn @select_bbox_component(c: i32, bbox: BBox) -> f32 {
+            fn @select_bbox_component(c: i32, bbox: &BBox) -> f32 {
                 match(c) {
                     0 => bbox.min.x,
                     2 => bbox.min.y,
@@ -124,56 +123,74 @@ extern fn make_bvh8_4(pc: i32, i: &[i32], f: &[f32]) -> OutputNode8Tri4 {
                 }
             }
             fn @bbox_component_or_minus_zero(c: i32, i: i32) -> f32 { if i >= child_count { 0f } else { select_bbox_component(c, children_bboxes(i)) }}
-            fn @make_bbox_component(c: i32) -> [f32 * 8] {
-                [bbox_component_or_minus_zero(c, 0), bbox_component_or_minus_zero(c, 1), bbox_component_or_minus_zero(c, 2), bbox_component_or_minus_zero(c, 3)
-                ,bbox_component_or_minus_zero(c, 4), bbox_component_or_minus_zero(c, 5), bbox_component_or_minus_zero(c, 6), bbox_component_or_minus_zero(c, 7)]
+
+            fn @fill_bbox_component(c: i32, data: &mut[f32 * 8]) -> () {
+                for i in range(0, 8) {
+                    data(i) = bbox_component_or_minus_zero(c, i);
+                }
+
+                //[bbox_component_or_minus_zero(c, 0), bbox_component_or_minus_zero(c, 1), bbox_component_or_minus_zero(c, 2), bbox_component_or_minus_zero(c, 3)
+                //,bbox_component_or_minus_zero(c, 4), bbox_component_or_minus_zero(c, 5), bbox_component_or_minus_zero(c, 6), bbox_component_or_minus_zero(c, 7)]
             }
-            fn @child_id_or_minus_one(i: i32) -> i32 { if i >= child_count { -1 } else { children_ids(i) }}
 
-            nodes(node_id) = Node8 {
-                bounds: [make_bbox_component(0), make_bbox_component(1), make_bbox_component(2), make_bbox_component(3), make_bbox_component(4), make_bbox_component(5)],
-                child: [
-                    child_id_or_minus_one(0),
-                    child_id_or_minus_one(1),
-                    child_id_or_minus_one(2),
-                    child_id_or_minus_one(3),
-                    child_id_or_minus_one(4),
-                    child_id_or_minus_one(5),
-                    child_id_or_minus_one(6),
-                    child_id_or_minus_one(7),
-                ],
-                pad: [0, 0, 0, 0, 0, 0, 0, 0],
-            };
+            for i in range(0, 6) {
+                fill_bbox_component(i, &mut nodes(node_id).bounds(i));
+            }
 
-            node_id + 1*/
+            fn @child_id_or_zero(i: i32) -> i32 { if i >= child_count { 0 } else { children_ids(i) }}
+            for i in range(0, 8) {
+                nodes(node_id).child(i) = child_id_or_zero(i);
+            }
+
+            node_id + 1
         },
-        write_leaf_node: | bbox, prim_offset, prim_count| {
-            0
-            /*let base_primitive_id = tris_count;
+        write_leaf_node: @ | bbox, prim_offset, prim_count| {
+            let base_primitive_id = tris_count;
 
-            let tri = load_tri(prim_offset);
-            let v0 = tri.v0;
-            let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
-            let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
-            let n = vec3_cross(e1, e2);
+            print_value(prim_offset, "eeee");
 
-            let (_, _, _, m) = load_indices(prim_offset);
+            let mut t = prim_offset;
+            let end = prim_offset + prim_count;
 
-            // todo actually loop & write all the primitives
-            // (works for now because the LBVH builder outputs only 1 primitive/node and doesn't try to merge anything )
+            while t < end {
+                let packet_size = cpu_intrinsics.min(max_primitive_packet_size, end - t);
 
-            tris(base_primitive_id) = Tri4 {
-                v0: [[v0.x, 0f, 0f, 0f], [v0.y, 0f, 0f, 0f], [v0.z, 0f, 0f, 0f]],
-                e1: [[e1.x, 0f, 0f, 0f], [e1.y, 0f, 0f, 0f], [e1.z, 0f, 0f, 0f]],
-                e2: [[e2.x, 0f, 0f, 0f], [e2.y, 0f, 0f, 0f], [e2.z, 0f, 0f, 0f]],
-                n:  [[n.x , 0f, 0f, 0f], [n.y , 0f, 0f, 0f], [n.z , 0f, 0f, 0f]],
-                prim_id: [prim_offset, -1, -1, -1],
-                geom_id: [m, -1, -1, -1],
-            };
+                let id = tris_count++;
 
-            tris_count++;
+                fn @spread_and_set(vec3: Vec3, place: i32, target: &mut[[f32 * 4] * 3]) -> () {
+                    target(0)(place) = vec3.x;
+                    target(1)(place) = vec3.y;
+                    target(2)(place) = vec3.z;
+                }
 
-            base_primitive_id ^ bitcast[i32](0xFFFFFFFFu32)*/
+                for i in range(0, packet_size) {
+                    print_value(i, "triangle i");
+                    let tri = load_tri(t);
+                    let v0 = tri.v0;
+                    let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
+                    let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
+                    let n = vec3_cross(e1, e2);
+
+                    let (_, _, _, m) = load_indices(t);
+
+                    spread_and_set(v0, i, &mut tris(id).v0);
+                    spread_and_set(e1, i, &mut tris(id).e1);
+                    spread_and_set(e2, i, &mut tris(id).e2);
+                    spread_and_set(n, i, &mut tris(id).n);
+
+                    tris(id).prim_id(i) = t;
+                    tris(id).geom_id(i) = m;
+
+                    t++;
+                }
+
+                for i in range(packet_size, max_primitive_packet_size) {
+                    tris(id).prim_id(i) = -1;
+                    tris(id).geom_id(i) = -1;
+                }
+            }
+
+            base_primitive_id ^ bitcast[i32](0xFFFFFFFFu32)
         },
     };
 

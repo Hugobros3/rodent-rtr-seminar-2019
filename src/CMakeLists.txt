@@ -88,7 +88,7 @@ anydsl_runtime_wrap(DISCARD_TMP_OBJS
 anydsl_runtime_wrap(CONVERTER_OBJS
         NAME "converter"
         CLANG_FLAGS ${CLANG_FLAGS}
-        IMPALA_FLAGS --log-level info
+        IMPALA_FLAGS --log-level debug
         FILES ${BVH_BUILDER_LIBRARY_IMPALA_FILES} ${CONVERTER_IMPALA_SRCS}
         #INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/converter/converter_interface
         )
