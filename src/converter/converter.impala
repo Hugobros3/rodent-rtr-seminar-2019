@@ -148,8 +148,8 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
             let mut t = prim_offset;
             let end = prim_offset + prim_count;
 
-            while t < end {
-                let packet_size = cpu_intrinsics.min(max_primitive_packet_size, end - t);
+            while t < end + 1 {
+                let packet_size = cpu_intrinsics.max(0, cpu_intrinsics.min(max_primitive_packet_size, end - t));
 
                 let id = tris_count++;
 
@@ -173,7 +173,11 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                     spread_and_set(e2, i, &mut tris(id).e2);
                     spread_and_set(n, i, &mut tris(id).n);
 
-                    tris(id).prim_id(i) = t;
+                    if (t < end - 1) {
+                        tris(id).prim_id(i) = t;
+                    } else  {
+                        tris(id).prim_id(i) = t | bitcast[i32](0x80000000u32);
+                    }
                     tris(id).geom_id(i) = m;
 
                     t++;
@@ -182,6 +186,7 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                 for i in range(packet_size, max_primitive_packet_size) {
                     tris(id).prim_id(i) = -1;
                     tris(id).geom_id(i) = -1;
+                    t++;
                 }
             }
 
