@@ -138,6 +138,9 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
     return false;
 }
 
+#define GAMMA_RAMP_SIZE 65536
+#define GAMMA_RAMP_SCALER 65535.0f
+
 static void update_texture(uint32_t * gamma_ramp, uint32_t* buf, SDL_Surface* target, size_t width, size_t height, uint32_t iter) {
     auto film = get_pixels();
     auto inv_iter = 1.0f / iter;
@@ -154,9 +157,9 @@ static void update_texture(uint32_t * gamma_ramp, uint32_t* buf, SDL_Surface* ta
                  uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);*/
 
             buf[y * width + x] =
-                (uint32_t(gamma_ramp[uint32_t(clamp((int)((r * inv_iter) * 255.0f), 0, 255))] << 16)) |
-                (uint32_t(gamma_ramp[uint32_t(clamp((int)((g * inv_iter) * 255.0f), 0, 255))] << 8)) |
-                 uint32_t(gamma_ramp[uint32_t(clamp((int)((b * inv_iter) * 255.0f), 0, 255))]) ;
+                (uint32_t(gamma_ramp[uint32_t(clamp((int)((r * inv_iter) * (GAMMA_RAMP_SCALER)), 0, GAMMA_RAMP_SIZE - 1))] << 16)) |
+                (uint32_t(gamma_ramp[uint32_t(clamp((int)((g * inv_iter) * (GAMMA_RAMP_SCALER)), 0, GAMMA_RAMP_SIZE - 1))] << 8)) |
+                 uint32_t(gamma_ramp[uint32_t(clamp((int)((b * inv_iter) * (GAMMA_RAMP_SCALER)), 0, GAMMA_RAMP_SIZE - 1))]) ;
         }
     }
     memcpy(target->pixels, buf, width * height * 4);
@@ -308,10 +311,11 @@ int main(int argc, char** argv) {
 #endif
 
     // generate gamma ramp in advance because std::pow is laughably slow
-    float gamma_rampf[256];
-    uint32_t gamma_ramp[256];
-    for(int i = 0; i < 256; i++) {
-        float f = i / 255.0f;
+    float gamma_rampf[GAMMA_RAMP_SIZE];
+    uint32_t gamma_ramp[GAMMA_RAMP_SIZE];
+
+    for(int i = 0; i < GAMMA_RAMP_SIZE; i++) {
+        float f = i / GAMMA_RAMP_SCALER;
         auto inv_gamma = 1.0f / 2.2f;
         gamma_rampf[i] = std::pow(f, inv_gamma);
         gamma_ramp[i] = uint32_t(gamma_rampf[i] * 255.0f);
