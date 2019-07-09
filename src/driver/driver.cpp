@@ -138,7 +138,7 @@ static bool handle_events(uint32_t& iter, Camera& cam) {
     return false;
 }
 
-static void update_texture(uint32_t* buf, SDL_Surface* target, size_t width, size_t height, uint32_t iter) {
+static void update_texture(uint32_t * gamma_ramp, uint32_t* buf, SDL_Surface* target, size_t width, size_t height, uint32_t iter) {
     auto film = get_pixels();
     auto inv_iter = 1.0f / iter;
     auto inv_gamma = 1.0f / 2.2f;
@@ -148,10 +148,15 @@ static void update_texture(uint32_t* buf, SDL_Surface* target, size_t width, siz
             auto g = film[(y * width + x) * 3 + 1];
             auto b = film[(y * width + x) * 3 + 2];
 
-            buf[y * width + x] =
+            /*buf[y * width + x] =
                 (uint32_t(clamp(std::pow(r * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f) << 16) |
                 (uint32_t(clamp(std::pow(g * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f) << 8)  |
-                 uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);
+                 uint32_t(clamp(std::pow(b * inv_iter, inv_gamma), 0.0f, 1.0f) * 255.0f);*/
+
+            buf[y * width + x] =
+                (uint32_t(gamma_ramp[uint32_t(clamp((int)((r * inv_iter) * 255.0f), 0, 255))] << 16)) |
+                (uint32_t(gamma_ramp[uint32_t(clamp((int)((g * inv_iter) * 255.0f), 0, 255))] << 8)) |
+                 uint32_t(gamma_ramp[uint32_t(clamp((int)((b * inv_iter) * 255.0f), 0, 255))]) ;
         }
     }
     memcpy(target->pixels, buf, width * height * 4);
@@ -302,6 +307,16 @@ int main(int argc, char** argv) {
     _mm_setcsr(_mm_getcsr() | (_MM_FLUSH_ZERO_ON | _MM_DENORMALS_ZERO_ON));
 #endif
 
+    // generate gamma ramp in advance because std::pow is laughably slow
+    float gamma_rampf[256];
+    uint32_t gamma_ramp[256];
+    for(int i = 0; i < 256; i++) {
+        float f = i / 255.0f;
+        auto inv_gamma = 1.0f / 2.2f;
+        gamma_rampf[i] = std::pow(f, inv_gamma);
+        gamma_ramp[i] = uint32_t(gamma_rampf[i] * 255.0f);
+    }
+
     auto spp = get_spp();
     bool done = false;
     uint64_t timing = 0;
@@ -359,7 +374,7 @@ int main(int argc, char** argv) {
         SDL_RenderCopy(renderer, texture, nullptr, nullptr);
         SDL_RenderPresent(renderer);
 #else
-        update_texture(buf.get(), screen, width, height, iter);
+        update_texture(gamma_ramp, buf.get(), screen, width, height, iter);
 #endif
         SDL_Flip(screen);
 #endif
