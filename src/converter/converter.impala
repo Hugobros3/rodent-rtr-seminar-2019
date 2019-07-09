@@ -108,6 +108,7 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
 
     let output_writer = OutputWriter {
         arity: 8,
+        leaf_primitives_packet_size: 4,
 
         write_inner_node: @ | node_id, bbox, child_count, children_ids, children_bboxes | {
             nodes_count++;
