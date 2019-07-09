@@ -454,6 +454,33 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
 }
 
 template<>
+void build_bvh<4, 4>(const obj::TriMesh &tri_mesh,
+                     std::vector<typename BvhNTriM<4, 4>::Node> &nodes,
+                     std::vector<typename BvhNTriM<4, 4>::Tri> &tris) {
+
+    std::cout << "we explicitely override bvh building for 4,4\n";
+
+    auto builder_input = ConverterInputTriMesh {
+            reinterpret_cast<int*>(const_cast<uint32_t *>(tri_mesh.indices.data())),
+            (int) tri_mesh.indices.size() / 4,
+            reinterpret_cast<float*>(const_cast<float3*>(tri_mesh.vertices.data())),
+
+    };
+
+    auto bvh4 = make_bvh4_4(builder_input.tri_count, builder_input.indices, builder_input.vertices);
+    auto built_nodes = bvh4.nodes;
+    auto built_tris = bvh4.tris;
+
+    std::cout << "nodes_count:" << bvh4.nodes_count << " primitives_count: " << bvh4.tris_count << "\n";
+
+    for(int i = 0; i < bvh4.nodes_count; i++)
+        nodes.push_back(built_nodes[i]);
+
+    for(int i = 0; i < bvh4.tris_count; i++)
+        tris.push_back(built_tris[i]);
+}
+
+template<>
 void build_bvh<2, 1>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<2, 1>::Node> &nodes,
                      std::vector<typename BvhNTriM<2, 1>::Tri> &tris) {
