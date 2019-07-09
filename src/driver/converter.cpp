@@ -425,6 +425,7 @@ static void build_bvh(const obj::TriMesh &tri_mesh,
 
 }
 
+#ifdef USE_FAST_BUILDER
 template<>
 void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<8, 4>::Node> &nodes,
@@ -432,22 +433,13 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
 
     std::cout << "we explicitely override bvh building for 8,4\n";
 
-    auto indices = anydsl_aligned_malloc(tri_mesh.indices.size() * sizeof(int32_t), 64);
-    memcpy(indices, tri_mesh.indices.data(), tri_mesh.indices.size() * sizeof(int32_t));
-
-    auto vertices = anydsl_aligned_malloc(tri_mesh.vertices.size() * sizeof(float3), 64);
-    memcpy(vertices, tri_mesh.vertices.data(), tri_mesh.vertices.size() * sizeof(float3));
-
     auto builder_input = ConverterInputTriMesh{
             reinterpret_cast<int*>(const_cast<uint32_t *>(tri_mesh.indices.data())),
-            //reinterpret_cast<int*>(indices),
-            //reinterpret_cast<float*>(vertices),
             (int) tri_mesh.indices.size() / 4,
             reinterpret_cast<float*>(const_cast<float3*>(tri_mesh.vertices.data())),
 
     };
 
-    //auto bvh8 = make_bvh8_4(builder_input);
     auto bvh8 = make_bvh8_4(builder_input.tri_count, builder_input.indices, builder_input.vertices);
     auto built_nodes = bvh8.nodes;
     auto built_tris = bvh8.tris;
@@ -460,6 +452,7 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
     for(int i = 0; i < bvh8.tris_count; i++)
         tris.push_back(built_tris[i]);
 }
+#endif
 
 template<typename Node, typename Tri>
 static void write_bvh(std::vector<Node> &nodes, std::vector<Tri> &tris) {
@@ -707,9 +700,9 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
             break;
     }
 
-    //os << "    let renderer = make_path_tracing_renderer(" << max_path_len << " /*max_path_len*/, " << spp
-    //<< " /*spp*/);\n"
-    os << "    let renderer = make_debug_renderer();"
+    os << "    let renderer = make_path_tracing_renderer(" << max_path_len << " /*max_path_len*/, " << spp
+    << " /*spp*/);\n"
+    //os << "    let renderer = make_debug_renderer();"
        << "    let math     = device.intrinsics;\n";
 
     // Setup camera
