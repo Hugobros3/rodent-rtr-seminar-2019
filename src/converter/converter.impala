@@ -33,6 +33,21 @@ struct Node8 {
     pad:     [i32 * 8]
 }
 
+struct Node2 {
+    bounds: [f32 * 12], // lo_x, hi_x, lo_y, hi_y, ...
+    child:  [i32 * 2],
+    pad:    [i32 * 2]
+}
+
+struct Tri1 {
+    v0: [f32 * 3],
+    pad: i32,
+    e1: [f32 * 3],
+    geom_id: i32,
+    e2: [f32 * 3],
+    prim_id: i32
+}
+
 struct Tri {
     v0: Vec3,
     v1: Vec3,
@@ -44,6 +59,42 @@ struct Tri {
 
 // extern fn make_bvh8_4(input_data: ConverterInputTriMesh) -> OutputNode8Tri4 {
 
+fn @load_indices(tri_mesh: ConverterInputTriMesh, t: i32) -> (i32, i32, i32, i32) {
+    let o = t * 4;
+    let i = tri_mesh.indices(o + 0);
+    let j = tri_mesh.indices(o + 1);
+    let k = tri_mesh.indices(o + 2);
+    let m = tri_mesh.indices(o + 3);
+    (i, j, k, m)
+}
+
+fn @load_vertex(tri_mesh: ConverterInputTriMesh, i: i32) -> Vec3 {
+    make_vec3 (
+        tri_mesh.vertices(i * 3 + 0),
+        tri_mesh.vertices(i * 3 + 1),
+        tri_mesh.vertices(i * 3 + 2),
+    )
+}
+
+fn @load_tri(tri_mesh: ConverterInputTriMesh, i: i32) -> Tri {
+    let (i0, i1, i2, _) = load_indices(tri_mesh, i);
+    Tri {
+        v0: load_vertex(tri_mesh, i0),
+        v1: load_vertex(tri_mesh, i1),
+        v2: load_vertex(tri_mesh, i2),
+    }
+}
+
+fn @tri_bbox(tri: Tri) -> BBox {
+    let min = vec3_min(tri.v0, vec3_min(tri.v1, tri.v2));
+    let max = vec3_max(tri.v0, vec3_max(tri.v1, tri.v2));
+    make_bbox(min, max)
+}
+
+fn @tri_center(tri: Tri) -> Vec3 {
+    vec3_mulf(vec3_add(tri.v0, vec3_add(tri.v1, tri.v2)), 0.3333333f)
+}
+
 extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
 
     let input_data = ConverterInputTriMesh {
@@ -52,51 +103,20 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
         vertices: vd,
     };
 
-    fn @load_indices(t: i32) -> (i32, i32, i32, i32) {
-        let o = t * 4;
-        let i = input_data.indices(o + 0);
-        let j = input_data.indices(o + 1);
-        let k = input_data.indices(o + 2);
-        let m = input_data.indices(o + 3);
-        (i, j, k, m)
-    }
-
-    fn @load_vertex(i: i32) -> Vec3 {
-        make_vec3 (
-            input_data.vertices(i * 3 + 0),
-            input_data.vertices(i * 3 + 1),
-            input_data.vertices(i * 3 + 2),
-        )
-    }
-
-    fn @load_tri(i: i32) -> Tri {
-        let (i0, i1, i2, _) = load_indices(i);
-        Tri {
-            v0: load_vertex(i0),
-            v1: load_vertex(i1),
-            v2: load_vertex(i2),
-        }
-    }
-
-    fn @tri_bbox(tri: Tri) -> BBox {
-        let min = vec3_min(tri.v0, vec3_min(tri.v1, tri.v2));
-        let max = vec3_max(tri.v0, vec3_max(tri.v1, tri.v2));
-        make_bbox(min, max)
-    }
-
-    fn @tri_center(tri: Tri) -> Vec3 {
-        vec3_mulf(vec3_add(tri.v0, vec3_add(tri.v1, tri.v2)), 0.3333333f)
-    }
-
     let input = Input {
         primitives_count: pc,
-        bboxes: @ | i | { @@tri_bbox(load_tri(i)) },
-        centers: @ | i | { @@tri_center(load_tri(i)) },
+        bboxes: @ | i | { @@tri_bbox(load_tri(input_data, i)) },
+        centers: @ | i | { @@tri_center(load_tri(input_data, i)) },
     };
 
+    let interm = build_bvh(input);
+
+    print_value(interm.leaf_nodes_count, "interm leaf nodes count");
+    print_value(interm.inner_nodes_count, "interm inner nodes count");
+
     //todo some good heuristic for sizing those
-    let nodes_buffer = alloc_cpu(sizeof[Node8]() * 655360);
-    let tris_buffer = alloc_cpu(sizeof[Tri4]() * 655360);
+    let nodes_buffer = alloc_cpu(sizeof[Node8]() * interm.inner_nodes_count);
+    let tris_buffer = alloc_cpu(sizeof[Tri4]() * pc);
 
     let nodes = nodes_buffer.data as &mut[Node8];
     let tris = tris_buffer.data as &mut[Tri4];
@@ -161,13 +181,13 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                 }
 
                 for i in range(0, packet_size) {
-                    let tri = load_tri(t);
+                    let tri = load_tri(input_data, t);
                     let v0 = tri.v0;
                     let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
                     let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
                     let n = vec3_cross(e1, e2);
 
-                    let (_, _, _, m) = load_indices(t);
+                    let (_, _, _, m) = load_indices(input_data, t);
 
                     spread_and_set(v0, i, &mut tris(id).v0);
                     spread_and_set(e1, i, &mut tris(id).e1);
@@ -195,7 +215,7 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
         },
     };
 
-    build_bvh(input, output_writer);
+    write_bvh(interm, output_writer);
 
     OutputNode8Tri4 {
         nodes_count: nodes_count,
