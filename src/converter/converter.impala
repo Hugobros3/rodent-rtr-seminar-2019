@@ -33,21 +33,6 @@ struct Node8 {
     pad:     [i32 * 8]
 }
 
-struct Node2 {
-    bounds: [f32 * 12], // lo_x, hi_x, lo_y, hi_y, ...
-    child:  [i32 * 2],
-    pad:    [i32 * 2]
-}
-
-struct Tri1 {
-    v0: [f32 * 3],
-    pad: i32,
-    e1: [f32 * 3],
-    geom_id: i32,
-    e2: [f32 * 3],
-    prim_id: i32
-}
-
 struct Tri {
     v0: Vec3,
     v1: Vec3,
@@ -223,4 +208,135 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
         tris_count: tris_count,
         tris: tris,
     }
+}
+
+struct Node2 {
+    bounds: [f32 * 12], // lo_x, hi_x, lo_y, hi_y, ...
+    child:  [i32 * 2],
+    pad:    [i32 * 2]
+}
+
+struct Tri1 {
+    v0: [f32 * 3],
+    pad: i32,
+    e1: [f32 * 3],
+    geom_id: i32,
+    e2: [f32 * 3],
+    prim_id: i32
+}
+
+extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode2Tri1 {
+
+    let input_data = ConverterInputTriMesh {
+        indices: ind,
+        tri_count: pc,
+        vertices: vd,
+    };
+
+    let input = Input {
+        primitives_count: pc,
+        bboxes: @ | i | { @@tri_bbox(load_tri(input_data, i)) },
+        centers: @ | i | { @@tri_center(load_tri(input_data, i)) },
+    };
+
+    let interm = build_bvh(input);
+
+    print_value(interm.leaf_nodes_count, "interm leaf nodes count");
+    print_value(interm.inner_nodes_count, "interm inner nodes count");
+
+    let nodes_buffer = alloc_cpu(sizeof[Node2]() * interm.inner_nodes_count);
+    let tris_buffer = alloc_cpu(sizeof[Tri1]() * pc);
+
+    let nodes = nodes_buffer.data as &mut[Node2];
+    let tris = tris_buffer.data as &mut[Tri1];
+
+    let mut nodes_count = 0;
+    let mut tris_count = 0;
+
+    let max_primitive_packet_size = 1;
+
+    let output_writer = OutputWriter {
+        arity: 2,
+        leaf_primitives_packet_size: 1,
+
+        write_inner_node: @ | node_id, bbox, child_count, children_ids, children_bboxes | {
+            nodes_count++;
+
+            fn @select_bbox_component(c: i32, bbox: &BBox) -> f32 {
+                match(c) {
+                    0 => bbox.min.x,
+                    2 => bbox.min.y,
+                    4 => bbox.min.z,
+                    1 => bbox.max.x,
+                    3 => bbox.max.y,
+                    5 => bbox.max.z,
+                    _ => -1f,
+                }
+            }
+            fn @bbox_component_or_minus_zero(c: i32, i: i32) -> f32 { if i >= child_count { 0f } else { select_bbox_component(c, children_bboxes(i)) }}
+
+            for i in range(0, 2) {
+                for j in range(0, 6) {
+                    nodes(node_id).bounds(i * 6 + j) = bbox_component_or_minus_zero(j, i);
+                }
+            }
+
+            fn @child_id_or_zero(i: i32) -> i32 { if i >= child_count { 0 } else { children_ids(i) }}
+            for i in range(0, 2) {
+                nodes(node_id).child(i) = child_id_or_zero(i);
+            }
+
+            node_id + 1
+        },
+        write_leaf_node: @ | bbox, prim_offset, prim_count| {
+            let base_primitive_id = tris_count;
+
+            let mut t = prim_offset;
+            let end = prim_offset + prim_count;
+
+            while t < end {
+                let id = tris_count++;
+
+                fn @spread_and_set(vec3: Vec3, target: &mut[f32 * 3]) -> () {
+                    target(0) = vec3.x;
+                    target(1) = vec3.y;
+                    target(2) = vec3.z;
+                }
+
+                let tri = load_tri(input_data, t);
+                let v0 = tri.v0;
+                let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
+                let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
+
+                let (_, _, _, m) = load_indices(input_data, t);
+
+                spread_and_set(v0, &mut tris(id).v0);
+                spread_and_set(e1, &mut tris(id).e1);
+                spread_and_set(e2, &mut tris(id).e2);
+
+                tris(id).prim_id = t | bitcast[i32](0x80000000u32);
+                tris(id).geom_id = m;
+
+                t++;
+            }
+
+            base_primitive_id ^ bitcast[i32](0xFFFFFFFFu32)
+        },
+    };
+
+    write_bvh(interm, output_writer);
+
+    OutputNode2Tri1 {
+        nodes_count: nodes_count,
+        nodes: nodes,
+        tris_count: tris_count,
+        tris: tris,
+    }
+}
+
+struct OutputNode2Tri1 {
+    nodes_count: i32,
+    nodes: &[Node2],
+    tris_count: i32,
+    tris: &[Tri1],
 }

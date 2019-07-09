@@ -452,6 +452,33 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
     for(int i = 0; i < bvh8.tris_count; i++)
         tris.push_back(built_tris[i]);
 }
+
+template<>
+void build_bvh<2, 1>(const obj::TriMesh &tri_mesh,
+                     std::vector<typename BvhNTriM<2, 1>::Node> &nodes,
+                     std::vector<typename BvhNTriM<2, 1>::Tri> &tris) {
+
+    std::cout << "we explicitely override bvh building for 2,1\n";
+
+    auto builder_input = ConverterInputTriMesh{
+            reinterpret_cast<int*>(const_cast<uint32_t *>(tri_mesh.indices.data())),
+            (int) tri_mesh.indices.size() / 4,
+            reinterpret_cast<float*>(const_cast<float3*>(tri_mesh.vertices.data())),
+
+    };
+
+    auto bvh2 = make_bvh2_1(builder_input.tri_count, builder_input.indices, builder_input.vertices);
+    auto built_nodes = bvh2.nodes;
+    auto built_tris = bvh2.tris;
+
+    std::cout << "nodes_count:" << bvh2.nodes_count << " primitives_count: " << bvh2.tris_count << "\n";
+
+    for(int i = 0; i < bvh2.nodes_count; i++)
+        nodes.push_back(built_nodes[i]);
+
+    for(int i = 0; i < bvh2.tris_count; i++)
+        tris.push_back(built_tris[i]);
+}
 #endif
 
 template<typename Node, typename Tri>
