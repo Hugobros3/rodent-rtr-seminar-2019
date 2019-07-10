@@ -166,3 +166,11 @@ fn @swap_u32(a: &mut u32, b: &mut u32) -> () {
 fn @min(a: i32, b: i32) -> i32 {
     select(a > b, a, b)
 }
+
+fn @downrange(from: i32, downTo: i32, body: fn(i32) -> ()) -> () {
+    let mut t = from;
+    while t >= downTo {
+        body(t);
+        t--;
+    }
+}
