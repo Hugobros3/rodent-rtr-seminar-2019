@@ -134,11 +134,11 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
 
             node_id + 1
         },
-        write_leaf_node: @ | bbox, prim_offset, prim_count| {
+        write_leaf_node: @ | bbox, prim_count, primitives | {
             let base_primitive_id = tris_count;
 
-            let mut t = prim_offset;
-            let end = prim_offset + prim_count;
+            let mut t = 0;
+            let end = prim_count;
 
             while t < end + 1 {
                 let packet_size = cpu_intrinsics.max(0, cpu_intrinsics.min(max_primitive_packet_size, end - t));
@@ -152,13 +152,15 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                 }
 
                 for i in range(0, packet_size) {
-                    let tri = load_tri(input_data, t);
+                    let prim_id = primitives(t);
+
+                    let tri = load_tri(input_data, prim_id);
                     let v0 = tri.v0;
                     let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
                     let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
                     let n = vec3_cross(e1, e2);
 
-                    let (_, _, _, m) = load_indices(input_data, t);
+                    let (_, _, _, m) = load_indices(input_data, prim_id);
 
                     spread_and_set(v0, i, &mut tris(id).v0);
                     spread_and_set(e1, i, &mut tris(id).e1);
@@ -166,9 +168,9 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
                     spread_and_set(n, i, &mut tris(id).n);
 
                     if (t < end - 1) {
-                        tris(id).prim_id(i) = t;
+                        tris(id).prim_id(i) = prim_id;
                     } else  {
-                        tris(id).prim_id(i) = t | bitcast[i32](0x80000000u32);
+                        tris(id).prim_id(i) = prim_id | bitcast[i32](0x80000000u32);
                     }
                     tris(id).geom_id(i) = m;
 
@@ -279,11 +281,11 @@ extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode4Tri4 {
 
             node_id + 1
         },
-        write_leaf_node: @ | bbox, prim_offset, prim_count| {
+        write_leaf_node: @ | bbox, prim_count, primitives| {
             let base_primitive_id = tris_count;
 
-            let mut t = prim_offset;
-            let end = prim_offset + prim_count;
+            let mut t = 0;
+            let end = prim_count;
 
             while t < end + 1 {
                 let packet_size = cpu_intrinsics.max(0, cpu_intrinsics.min(max_primitive_packet_size, end - t));
@@ -297,13 +299,15 @@ extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode4Tri4 {
                 }
 
                 for i in range(0, packet_size) {
-                    let tri = load_tri(input_data, t);
+                    let prim_id = primitives(t);
+
+                    let tri = load_tri(input_data, prim_id);
                     let v0 = tri.v0;
                     let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
                     let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
                     let n = vec3_cross(e1, e2);
 
-                    let (_, _, _, m) = load_indices(input_data, t);
+                    let (_, _, _, m) = load_indices(input_data, prim_id);
 
                     spread_and_set(v0, i, &mut tris(id).v0);
                     spread_and_set(e1, i, &mut tris(id).e1);
@@ -311,9 +315,9 @@ extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode4Tri4 {
                     spread_and_set(n, i, &mut tris(id).n);
 
                     if (t < end - 1) {
-                        tris(id).prim_id(i) = t;
+                        tris(id).prim_id(i) = prim_id;
                     } else  {
-                        tris(id).prim_id(i) = t | bitcast[i32](0x80000000u32);
+                        tris(id).prim_id(i) = prim_id | bitcast[i32](0x80000000u32);
                     }
                     tris(id).geom_id(i) = m;
 
@@ -427,11 +431,11 @@ extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode2Tri1 {
 
             node_id + 1
         },
-        write_leaf_node: @ | bbox, prim_offset, prim_count| {
+        write_leaf_node: @ | bbox, prim_count, primitives | {
             let base_primitive_id = tris_count;
 
-            let mut t = prim_offset;
-            let end = prim_offset + prim_count;
+            let mut t = 0;
+            let end = prim_count;
 
             while t < end {
                 let id = tris_count++;
@@ -442,18 +446,20 @@ extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode2Tri1 {
                     target(2) = vec3.z;
                 }
 
-                let tri = load_tri(input_data, t);
+                let prim_id = primitives(t);
+
+                let tri = load_tri(input_data, prim_id);
                 let v0 = tri.v0;
                 let e1 = vec3_sub(tri.v0, tri.v1); // v0 - v1
                 let e2 = vec3_sub(tri.v2, tri.v0); // v2 - v0
 
-                let (_, _, _, m) = load_indices(input_data, t);
+                let (_, _, _, m) = load_indices(input_data, prim_id);
 
                 spread_and_set(v0, &mut tris(id).v0);
                 spread_and_set(e1, &mut tris(id).e1);
                 spread_and_set(e2, &mut tris(id).e2);
 
-                tris(id).prim_id = t | bitcast[i32](0x80000000u32);
+                tris(id).prim_id = prim_id | bitcast[i32](0x80000000u32);
                 tris(id).geom_id = m;
 
                 t++;
