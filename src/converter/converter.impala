@@ -82,11 +82,11 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
 
     let interm = build_bvh(input);
 
-    print_value(interm.leaf_nodes_count, "interm leaf nodes count");
-    print_value(interm.inner_nodes_count, "interm inner nodes count");
+    print_value(interm.bvh.leaf_nodes_count, "interm leaf nodes count");
+    print_value(interm.bvh.inner_nodes_count, "interm inner nodes count");
 
     //todo some good heuristic for sizing those
-    let nodes_buffer = alloc_cpu(sizeof[Node8]() * interm.inner_nodes_count);
+    let nodes_buffer = alloc_cpu(sizeof[Node8]() * interm.bvh.inner_nodes_count);
     let tris_buffer = alloc_cpu(sizeof[Tri4]() * pc);
 
     let nodes = nodes_buffer.data as &mut[Node8];
@@ -229,11 +229,11 @@ extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode4Tri4 {
 
     let interm = build_bvh(input);
 
-    print_value(interm.leaf_nodes_count, "interm leaf nodes count");
-    print_value(interm.inner_nodes_count, "interm inner nodes count");
+    print_value(interm.bvh.leaf_nodes_count, "interm leaf nodes count");
+    print_value(interm.bvh.inner_nodes_count, "interm inner nodes count");
 
     //todo some good heuristic for sizing those
-    let nodes_buffer = alloc_cpu(sizeof[Node4]() * interm.inner_nodes_count);
+    let nodes_buffer = alloc_cpu(sizeof[Node4]() * interm.bvh.inner_nodes_count);
     let tris_buffer = alloc_cpu(sizeof[Tri4]() * pc);
 
     let nodes = nodes_buffer.data as &mut[Node4];
@@ -384,10 +384,10 @@ extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode2Tri1 {
 
     let interm = build_bvh(input);
 
-    print_value(interm.leaf_nodes_count, "interm leaf nodes count");
-    print_value(interm.inner_nodes_count, "interm inner nodes count");
+    print_value(interm.bvh.leaf_nodes_count, "interm leaf nodes count");
+    print_value(interm.bvh.inner_nodes_count, "interm inner nodes count");
 
-    let nodes_buffer = alloc_cpu(sizeof[Node2]() * interm.inner_nodes_count);
+    let nodes_buffer = alloc_cpu(sizeof[Node2]() * interm.bvh.inner_nodes_count);
     let tris_buffer = alloc_cpu(sizeof[Tri1]() * pc);
 
     let nodes = nodes_buffer.data as &mut[Node2];
