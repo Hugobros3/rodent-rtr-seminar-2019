@@ -431,6 +431,8 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<8, 4>::Node> &nodes,
                      std::vector<typename BvhNTriM<8, 4>::Tri> &tris) {
 
+    int64_t start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
     std::cout << "we explicitely override bvh building for 8,4\n";
 
     auto builder_input = ConverterInputTriMesh{
@@ -451,6 +453,11 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
 
     for(int i = 0; i < bvh8.tris_count; i++)
         tris.push_back(built_tris[i]);
+
+    int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+    int64_t diff = now - start_time;
+    std::cout << "BVH build took " << diff << "ms total\n";
 }
 
 template<>
@@ -458,6 +465,8 @@ void build_bvh<4, 4>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<4, 4>::Node> &nodes,
                      std::vector<typename BvhNTriM<4, 4>::Tri> &tris) {
 
+    int64_t start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
     std::cout << "we explicitely override bvh building for 4,4\n";
 
     auto builder_input = ConverterInputTriMesh {
@@ -478,6 +487,11 @@ void build_bvh<4, 4>(const obj::TriMesh &tri_mesh,
 
     for(int i = 0; i < bvh4.tris_count; i++)
         tris.push_back(built_tris[i]);
+
+    int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+    int64_t diff = now - start_time;
+    std::cout << "BVH build took " << diff << "ms total\n";
 }
 
 template<>
@@ -485,6 +499,8 @@ void build_bvh<2, 1>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<2, 1>::Node> &nodes,
                      std::vector<typename BvhNTriM<2, 1>::Tri> &tris) {
 
+    int64_t start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
     std::cout << "we explicitely override bvh building for 2,1\n";
 
     auto builder_input = ConverterInputTriMesh{
@@ -495,6 +511,11 @@ void build_bvh<2, 1>(const obj::TriMesh &tri_mesh,
     };
 
     auto bvh2 = make_bvh2_1(builder_input.tri_count, builder_input.indices, builder_input.vertices);
+
+    int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+    int64_t diff = now - start_time;
+    std::cout << "BVH build took " << diff << "ms total\n";
     auto built_nodes = bvh2.nodes;
     auto built_tris = bvh2.tris;
 
