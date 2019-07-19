@@ -17,8 +17,8 @@ struct Tri1 {
 
 fn @make_gpu_bvh2_tri1(nodes: &[Node2], tris: &[Tri1], is_nvvm: bool) -> Bvh {
     // Use texture cache when generating code with NVVM
-    let load4_f32 = @ |p, i| if is_nvvm { nvvm_ldg4_f32(&p(i)) } else { p(i) };
-    let load4_i32 = @ |p, i| if is_nvvm { nvvm_ldg4_i32(&p(i)) } else { p(i) };
+    let load4_f32 = @ |p, i| { (p as &[1][simd[f32 * 4]])(i) };
+    let load4_i32 = @ |p, i| { (p as &[1][simd[i32 * 4]])(i) };
 
     Bvh {
         node: @ |j| {

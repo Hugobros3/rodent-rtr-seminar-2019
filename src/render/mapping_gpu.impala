@@ -542,33 +542,33 @@ fn @make_nvvm_device(dev: i32, streaming: bool) -> Device {
         rodent_load_bvh2_tri1(dev_id, filename, &mut nodes, &mut tris);
         make_gpu_bvh2_tri1(nodes, tris, true)
     };
-    let read_pixel = @ |p, i| bitcast[u32](nvvm_ldg_i32(&p(i) as &[1]i32));
+    let read_pixel = @ |p, i| bitcast[u32](p(i) as &[1]i32);
     let make_buffer = @ |p| {
         DeviceBuffer {
-            load_f32:  @ |i| nvvm_ldg_f32(&((p as &[1][f32])(i))),
-            load_i32:  @ |i| nvvm_ldg_i32(&((p as &[1][i32])(i))),
+            load_f32:  @ |i| ((p as &[1][f32])(i)),
+            load_i32:  @ |i| ((p as &[1][i32])(i)),
             load_vec2: @ |i| {
-                let v = nvvm_ldg4_f32(&(p as &[1][simd[f32 * 4]](i)));
+                let v = (p as &[1][simd[f32 * 4]](i));
                 make_vec2(v(0), v(1))
             },
             load_vec3: @ |i| {
-                let v = nvvm_ldg4_f32(&((p as &[1][simd[f32 * 4]])(i)));
+                let v = ((p as &[1][simd[f32 * 4]])(i));
                 make_vec3(v(0), v(1), v(2))
             },
             load_vec4: @ |i| {
-                let v = nvvm_ldg4_f32(&(p as &[1][simd[f32 * 4]](i)));
+                let v = (p as &[1][simd[f32 * 4]](i));
                 make_vec4(v(0), v(1), v(2), v(3))
             },
             load_int2: @ |i| {
-                let v = nvvm_ldg4_i32(&(p as &[1][simd[i32 * 4]](i)));
+                let v = (p as &[1][simd[i32 * 4]](i));
                 (v(0), v(1))
             },
             load_int3: @ |i| {
-                let v = nvvm_ldg4_i32(&(p as &[1][simd[i32 * 4]](i)));
+                let v = (p as &[1][simd[i32 * 4]](i));
                 (v(0), v(1), v(2))
             },
             load_int4: @ |i| {
-                let v = nvvm_ldg4_i32(&(p as &[1][simd[i32 * 4]](i)));
+                let v = (p as &[1][simd[i32 * 4]](i));
                 (v(0), v(1), v(2), v(3))
             }
         }
