@@ -20,7 +20,7 @@ struct OutputNode8Tri4 {
     int tris_count;
     struct Tri4 const* tris;
 };
-struct OutputNode8Tri4 make_bvh8_4(int vertices_count, int const* indices, float const* vertices);
+struct OutputNode8Tri4 make_bvh8_4(int vertices_count, int const* indices, float const* vertices, int platform, int device_threads);
 
 struct OutputNode4Tri4 {
     int nodes_count;
@@ -28,7 +28,7 @@ struct OutputNode4Tri4 {
     int tris_count;
     struct Tri4 const* tris;
 };
-struct OutputNode4Tri4 make_bvh4_4(int vertices_count, int const* indices, float const* vertices);
+struct OutputNode4Tri4 make_bvh4_4(int vertices_count, int const* indices, float const* vertices, int platform, int device_threads);
 
 struct OutputNode2Tri1 {
     int nodes_count;
@@ -36,7 +36,7 @@ struct OutputNode2Tri1 {
     int tris_count;
     struct Tri1 const* tris;
 };
-struct OutputNode2Tri1 make_bvh2_1(int vertices_count, int const* indices, float const* vertices);
+struct OutputNode2Tri1 make_bvh2_1(int vertices_count, int const* indices, float const* vertices, int platform, int device_threads);
 
 #ifdef __cplusplus
 }

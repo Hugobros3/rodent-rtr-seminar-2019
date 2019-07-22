@@ -23,6 +23,7 @@
 
 #include <sys/stat.h>
 #include <anydsl_runtime.h>
+#include <thread>
 
 #define create_directory(d) { umask(0); mkdir(d, 0777); }
 #endif
@@ -407,11 +408,17 @@ static void write_tri_mesh(const obj::TriMesh &tri_mesh, bool enable_padding) {
     write_buffer("data/texcoords.bin", pad_buffer(tri_mesh.texcoords, enable_padding, sizeof(float) * 4));
 }
 
+typedef struct {
+    int platform;
+    int device_or_threads;
+} BuilderConfig;
 
 template<size_t N, size_t M>
 static void build_bvh(const obj::TriMesh &tri_mesh,
                       std::vector<typename BvhNTriM<N, M>::Node> &nodes,
-                      std::vector<typename BvhNTriM<N, M>::Tri> &tris) {
+                      std::vector<typename BvhNTriM<N, M>::Tri> &tris,
+                      BuilderConfig config
+) {
     BvhNTriMAdapter<N, M> adapter(nodes, tris);
     auto num_tris = tri_mesh.indices.size() / 4;
     std::vector<::Tri> in_tris(num_tris);
@@ -429,7 +436,8 @@ static void build_bvh(const obj::TriMesh &tri_mesh,
 template<>
 void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<8, 4>::Node> &nodes,
-                     std::vector<typename BvhNTriM<8, 4>::Tri> &tris) {
+                     std::vector<typename BvhNTriM<8, 4>::Tri> &tris,
+                      BuilderConfig config) {
 
     int64_t start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -442,7 +450,7 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
 
     };
 
-    auto bvh8 = make_bvh8_4(builder_input.tri_count, builder_input.indices, builder_input.vertices);
+    auto bvh8 = make_bvh8_4(builder_input.tri_count, builder_input.indices, builder_input.vertices, config.platform, config.device_or_threads);
     auto built_nodes = bvh8.nodes;
     auto built_tris = bvh8.tris;
 
@@ -463,7 +471,8 @@ void build_bvh<8, 4>(const obj::TriMesh &tri_mesh,
 template<>
 void build_bvh<4, 4>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<4, 4>::Node> &nodes,
-                     std::vector<typename BvhNTriM<4, 4>::Tri> &tris) {
+                     std::vector<typename BvhNTriM<4, 4>::Tri> &tris,
+                      BuilderConfig config) {
 
     int64_t start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -476,7 +485,7 @@ void build_bvh<4, 4>(const obj::TriMesh &tri_mesh,
 
     };
 
-    auto bvh4 = make_bvh4_4(builder_input.tri_count, builder_input.indices, builder_input.vertices);
+    auto bvh4 = make_bvh4_4(builder_input.tri_count, builder_input.indices, builder_input.vertices, config.platform, config.device_or_threads);
     auto built_nodes = bvh4.nodes;
     auto built_tris = bvh4.tris;
 
@@ -497,7 +506,8 @@ void build_bvh<4, 4>(const obj::TriMesh &tri_mesh,
 template<>
 void build_bvh<2, 1>(const obj::TriMesh &tri_mesh,
                      std::vector<typename BvhNTriM<2, 1>::Node> &nodes,
-                     std::vector<typename BvhNTriM<2, 1>::Tri> &tris) {
+                     std::vector<typename BvhNTriM<2, 1>::Tri> &tris,
+                      BuilderConfig config) {
 
     int64_t start_time = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -510,7 +520,7 @@ void build_bvh<2, 1>(const obj::TriMesh &tri_mesh,
 
     };
 
-    auto bvh2 = make_bvh2_1(builder_input.tri_count, builder_input.indices, builder_input.vertices);
+    auto bvh2 = make_bvh2_1(builder_input.tri_count, builder_input.indices, builder_input.vertices, config.platform, config.device_or_threads);
 
     int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -776,8 +786,8 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
     }
 
     os << "    let renderer = make_path_tracing_renderer(" << max_path_len << " /*max_path_len*/, " << spp
-    << " /*spp*/);\n"
-    //os << "    let renderer = make_debug_renderer();"
+       << " /*spp*/);\n"
+       //os << "    let renderer = make_debug_renderer();"
        << "    let math     = device.intrinsics;\n";
 
     // Setup camera
@@ -840,6 +850,8 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
 
     write_tri_mesh(tri_mesh, enable_padding);
 
+    BuilderConfig cfg;
+
     // Generate BVHs
     if (must_build_bvh(file_name, target)) {
         info("Generating BVH for '", file_name, "'");
@@ -848,7 +860,7 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
             target == Target::AMDGPU_STREAMING || target == Target::AMDGPU_MEGAKERNEL) {
             std::vector<typename BvhNTriM<2, 1>::Node> nodes;
             std::vector<typename BvhNTriM<2, 1>::Tri> tris;
-            build_bvh<2, 1>(tri_mesh, nodes, tris);
+            build_bvh<2, 1>(tri_mesh, nodes, tris, cfg);
             write_bvh(nodes, tris);
         } else if (target == Target::GENERIC || target == Target::ASIMD || target == Target::SSE42) {
             std::vector<typename BvhNTriM<4, 4>::Node> nodes;
@@ -857,7 +869,7 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
             if (embree_bvh) build_embree_bvh<4>(tri_mesh, nodes, tris);
             else
 #endif
-            build_bvh<4, 4>(tri_mesh, nodes, tris);
+            build_bvh<4, 4>(tri_mesh, nodes, tris, cfg);
             write_bvh(nodes, tris);
         } else {
             std::vector<typename BvhNTriM<8, 4>::Node> nodes;
@@ -866,7 +878,7 @@ convert_obj(const std::string &file_name, Target target, size_t dev, size_t max_
             if (embree_bvh) build_embree_bvh<8>(tri_mesh, nodes, tris);
             else
 #endif
-            build_bvh<8, 4>(tri_mesh, nodes, tris);
+            build_bvh<8, 4>(tri_mesh, nodes, tris, cfg);
             write_bvh(nodes, tris);
         }
         std::ofstream bvh_stamp("data/bvh.stamp");
@@ -1119,6 +1131,8 @@ static void usage() {
               << "           --max-path-len        Sets the maximum path length (default: 64)\n"
               << "    -spp   --samples-per-pixel   Sets the number of samples per pixel (default: 4)\n"
               << "           --fusion              Enables megakernel shader fusion (default: disabled)\n"
+              << "    -b     --build-with          For the LBVH builder: specify whether to use the same device as the target platform (same) or to force the cpu (cpu)\n"
+              << "    -j     --threads             For the LBVH builder: specify the number of threads to use\n"
               #ifdef ENABLE_EMBREE_BVH
               << "           --embree-bvh          Use Embree to build the BVH (default: disabled)\n"
               #endif
@@ -1150,6 +1164,10 @@ int main(int argc, char **argv) {
     auto target = Target::INVALID;
     bool embree_bvh = false;
     bool fusion = false;
+
+    bool force_cpu_builder = false;
+    int threads = std::thread::hardware_concurrency();
+
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
             if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
@@ -1181,6 +1199,17 @@ int main(int argc, char **argv) {
                     std::cerr << "Unknown target '" << argv[i] << "'. Aborting." << std::endl;
                     return 1;
                 }
+            } else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--build-with")) {
+                if (!check_option(i++, argc, argv)) return 1;
+                if (!strcmp(argv[i], "same")) {
+                    force_cpu_builder = false;
+                } else if (!strcmp(argv[i], "cpu"))
+                    force_cpu_builder = true;
+            } else if (!strcmp(argv[i], "-j") || !strcmp(argv[i], "--threads")) {
+                if (!check_option(i++, argc, argv)) return 1;
+                threads = strtoul(argv[i], NULL, 10);
+                if(threads <= 0 || threads > 4096)
+                    threads = std::thread::hardware_concurrency();
             } else if (!strcmp(argv[i], "-d") || !strcmp(argv[i], "--device")) {
                 if (!check_option(i++, argc, argv)) return 1;
                 dev = strtoul(argv[i], NULL, 10);
@@ -1207,6 +1236,18 @@ int main(int argc, char **argv) {
             }
             obj_file = argv[i];
         }
+    }
+
+    BuilderConfig cfg;
+    if((target == Target::AMDGPU_MEGAKERNEL || target == Target::AMDGPU_STREAMING) && !force_cpu_builder) {
+        cfg.platform = 3;
+        cfg.device_or_threads = dev;
+    } else if((target == Target::NVVM_MEGAKERNEL || target == Target::NVVM_STREAMING) && !force_cpu_builder) {
+        cfg.platform = 1;
+        cfg.device_or_threads = dev;
+    } else {
+        cfg.platform = 0;
+        cfg.device_or_threads = threads;
     }
 
     if (fusion && target != Target::NVVM_MEGAKERNEL && target != Target::AMDGPU_MEGAKERNEL) {

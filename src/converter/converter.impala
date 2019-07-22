@@ -66,7 +66,7 @@ struct Node8 {
     pad:     [i32 * 8]
 }
 
-extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
+extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32], platform:i32, device_threads: i32) -> OutputNode8Tri4 {
 
     let input_data = ConverterInputTriMesh {
         indices: ind,
@@ -80,7 +80,7 @@ extern fn make_bvh8_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode8Tri4 {
         centers: @ | i | { @@tri_center(load_tri(input_data, i)) },
     };
 
-    let interm = build_bvh(input);
+    let interm = build_bvh(input, platform, device_threads);
 
     print_value(interm.bvh.leaf_nodes_count, "interm leaf nodes count");
     print_value(interm.bvh.inner_nodes_count, "interm inner nodes count");
@@ -213,7 +213,7 @@ struct Node4 {
     pad:     [i32 * 4]
 }
 
-extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode4Tri4 {
+extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32], platform: i32, device_threads: i32) -> OutputNode4Tri4 {
 
     let input_data = ConverterInputTriMesh {
         indices: ind,
@@ -227,7 +227,7 @@ extern fn make_bvh4_4(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode4Tri4 {
         centers: @ | i | { @@tri_center(load_tri(input_data, i)) },
     };
 
-    let interm = build_bvh(input);
+    let interm = build_bvh(input, platform, device_threads);
 
     print_value(interm.bvh.leaf_nodes_count, "interm leaf nodes count");
     print_value(interm.bvh.inner_nodes_count, "interm inner nodes count");
@@ -368,7 +368,7 @@ struct Tri1 {
     prim_id: i32
 }
 
-extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode2Tri1 {
+extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32], platform: i32, device_threads: i32) -> OutputNode2Tri1 {
 
     let input_data = ConverterInputTriMesh {
         indices: ind,
@@ -382,7 +382,7 @@ extern fn make_bvh2_1(pc: i32, ind: &[i32], vd: &[f32]) -> OutputNode2Tri1 {
         centers: @ | i | { @@tri_center(load_tri(input_data, i)) },
     };
 
-    let interm = build_bvh(input);
+    let interm = build_bvh(input, platform, device_threads);
 
     print_value(interm.bvh.leaf_nodes_count, "interm leaf nodes count");
     print_value(interm.bvh.inner_nodes_count, "interm inner nodes count");
