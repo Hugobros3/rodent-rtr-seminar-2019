@@ -153,11 +153,21 @@ fn @cpu_traverse_single_helper( mut ray: Ray
 
     stack.push(root, ray.tmin);
 
-    let extract_hit = @ |hit: Hit, lane: i32| Hit {
-        geom_id   = bitcast[i32](rv_extract(bitcast[f32](hit.geom_id), lane)),
-        prim_id   = bitcast[i32](rv_extract(bitcast[f32](hit.prim_id), lane)),
-        distance  = rv_extract(hit.distance, lane),
-        uv_coords = make_vec2(rv_extract(hit.uv_coords.x, lane), rv_extract(hit.uv_coords.y, lane))
+    let extract_hit = @ |hit: Hit, lane: i32| {
+        let h = Hit {
+            geom_id   = bitcast[i32](rv_extract(bitcast[f32](hit.geom_id), lane)),
+            prim_id   = bitcast[i32](rv_extract(bitcast[f32](hit.prim_id), lane)),
+            distance  = rv_extract(hit.distance, lane),
+            uv_coords = make_vec2(rv_extract(hit.uv_coords.x, lane), rv_extract(hit.uv_coords.y, lane))
+        };
+
+        // If you comment these out, these will be NaNs and you'll have black artifacts in the output
+        // If you leave them active, instead of crashing at runtime the compiler will somehow emit different garbage and you'll get different artifacts
+        // Cheeky !
+        enforce_nonan_f32(h.uv_coords.x);
+        enforce_nonan_f32(h.uv_coords.y);
+
+        h
     };
 
     // Traversal loop
