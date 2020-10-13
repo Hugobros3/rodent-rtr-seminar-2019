@@ -233,14 +233,15 @@ fn @cpu_generate_rays( primary: PrimaryStream
 
 fn @cpu_traverse_primary(scene: Scene, min_max: MinMax, primary: &PrimaryStream, single: bool, vector_width: i32) -> () {
     fn cpu_traverse_primary_specialized(primary: &PrimaryStream) -> () {
-        cpu_traverse_hybrid(
+        //cpu_traverse_hybrid(
+        cpu_traverse_single(
             min_max,
             scene.bvh,
             make_ray_stream_reader(primary.rays, vector_width),
             make_primary_stream_hit_writer(*primary, vector_width, scene.num_geometries),
             vector_width /*packet_size*/,
             primary.size / vector_width + select(primary.size % vector_width != 0, 1, 0),
-            single,
+            //single,
             false /*any_hit*/
         );
     }

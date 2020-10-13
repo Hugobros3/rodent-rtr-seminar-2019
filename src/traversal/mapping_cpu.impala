@@ -243,6 +243,9 @@ fn @cpu_traverse_single_helper( mut ray: Ray
                                 hit = extract_hit(prim_hit, lane);
                                 ray.tmax = hit.distance;
                             }
+
+                            enforce_nonan_f32(hit.uv_coords.x);
+                            enforce_nonan_f32(hit.uv_coords.y);
                         },
                         _ => ()
                     }
@@ -295,6 +298,13 @@ fn @cpu_traverse_hybrid_helper( mut ray: Ray
         rv_store(&mut hit_ptr.distance, lane, hit.distance);
         rv_store(&mut hit_ptr.uv_coords.x, lane, hit.uv_coords.x);
         rv_store(&mut hit_ptr.uv_coords.y, lane, hit.uv_coords.y);
+
+        enforce_nonan_f32(hit.uv_coords.x); // Fine
+        enforce_nonan_f32(hit.uv_coords.y);
+
+        enforce_nonan_f32(hit_ptr.uv_coords.x);
+        enforce_nonan_f32(hit_ptr.uv_coords.y);
+
         rv_store(bitcast[&mut f32](&mut hit_ptr.prim_id), lane, bitcast[f32](hit.prim_id));
         rv_store(bitcast[&mut f32](&mut hit_ptr.geom_id), lane, bitcast[f32](hit.geom_id));
     };
@@ -309,7 +319,7 @@ fn @cpu_traverse_hybrid_helper( mut ray: Ray
             let active = (stack.top().tmin <= ray.tmax) & !terminated;
             let mask = rv_ballot(active);
             if likely(mask != 0) {
-                if single && cpu_popcount32(mask) <= switch_threshold {
+                if single && cpu_popcount32(mask) <= switch_threshold { // PROBLEM SPOT
                     for lane in cpu_one_bits(mask) {
                         let lane_ray = load_ray(&ray, lane);
                         let lane_octant = bitcast[RayOctant](rv_extract(bitcast[f32](octant), lane));
@@ -374,6 +384,9 @@ fn @cpu_traverse_hybrid_helper( mut ray: Ray
                                     terminated = true;
                                     active = false;
                                 }
+
+                                enforce_nonan_f32(hit.uv_coords.x);
+                                enforce_nonan_f32(hit.uv_coords.y);
                             },
                             _ => ()
                         }
