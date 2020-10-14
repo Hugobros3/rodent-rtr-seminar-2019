@@ -164,11 +164,13 @@ fn @cpu_traverse_single_helper( mut ray: Ray
         // If you comment these out, these will be NaNs and you'll have black artifacts in the output
         // If you leave them active, instead of crashing at runtime the compiler will somehow emit different garbage and you'll get different artifacts
         // Cheeky !
-        enforce_nonan_f32(h.uv_coords.x);
-        enforce_nonan_f32(h.uv_coords.y);
+        // enforce_nonan_f32(h.uv_coords.x);
+        // enforce_nonan_f32(h.uv_coords.y);
 
         h
     };
+
+    fn vectorize_nt(n: i32, f: fn(i32) -> ()) = range(f)(0, n);
 
     // Traversal loop
     vectorize(bvh.arity, |i| {
@@ -238,19 +240,49 @@ fn @cpu_traverse_single_helper( mut ray: Ray
 
                 // Intersect primitives
                 vectorize(prim.size, |j| {
+                    if prim.is_valid(j) {
+                        let mut hit2: Hit = empty_hit(flt_max);
+                        let mut did_hit = false;
+
+                        match prim.intersect(j, cpu_intrinsics, ray) {
+                            Option[Hit]::Some(prim_hit) => {
+                                hit2 = prim_hit;
+                                did_hit = true;
+                            },
+                            _ => {}
+                        }
+
+                        if rv_ballot(did_hit) != 0 {
+                            if any_hit {
+                                // Early exit mode
+                                let lane = cpu_ctz32(rv_ballot(did_hit), true);
+                                hit = extract_hit(hit2, lane);
+                            } else {
+                                //let hit_distance = hit2.distance;
+                                let hit_distance = select(rv_mask(), hit2.distance, flt_max);
+                                let min_distance = cpu_reduce(hit_distance, prim.size, min_max.fminf);
+                                let lane = cpu_index_of(hit_distance, min_distance);
+                                hit = extract_hit(hit2, lane);
+                                ray.tmax = hit.distance;
+                            }
+                        }
+                    }
+                });
+
+                /*vectorize_nt(prim.size, |j| {
                     if !prim.is_valid(j) { return() }
                     match prim.intersect(j, cpu_intrinsics, ray) {
                         Option[Hit]::Some(prim_hit) => {
                             if any_hit {
                                 // Early exit mode
-                                let lane = cpu_ctz32(rv_ballot(true), true);
-                                hit = extract_hit(prim_hit, lane);
+                                //let lane = cpu_ctz32(rv_ballot(true), true);
+                                hit = prim_hit;//extract_hit(prim_hit, lane);
                                 terminated = true;
                             } else {
-                                let hit_distance = select(rv_mask(), prim_hit.distance, flt_max);
-                                let min_distance = cpu_reduce(hit_distance, prim.size, min_max.fminf);
-                                let lane = cpu_index_of(hit_distance, min_distance);
-                                hit = extract_hit(prim_hit, lane);
+                                //let hit_distance = select(rv_mask(), prim_hit.distance, flt_max);
+                                //let min_distance = cpu_reduce(hit_distance, prim.size, min_max.fminf);
+                                //let lane = cpu_index_of(hit_distance, min_distance);
+                                hit = prim_hit;//extract_hit(prim_hit, lane);
                                 ray.tmax = hit.distance;
                             }
 
@@ -259,7 +291,7 @@ fn @cpu_traverse_single_helper( mut ray: Ray
                         },
                         _ => ()
                     }
-                });
+                });*/
 
                 // Sentinel test
                 if prim.is_last { break() }
@@ -309,11 +341,11 @@ fn @cpu_traverse_hybrid_helper( mut ray: Ray
         rv_store(&mut hit_ptr.uv_coords.x, lane, hit.uv_coords.x);
         rv_store(&mut hit_ptr.uv_coords.y, lane, hit.uv_coords.y);
 
-        enforce_nonan_f32(hit.uv_coords.x); // Fine
-        enforce_nonan_f32(hit.uv_coords.y);
+        //enforce_nonan_f32(hit.uv_coords.x); // Fine
+        //enforce_nonan_f32(hit.uv_coords.y);
 
-        enforce_nonan_f32(hit_ptr.uv_coords.x);
-        enforce_nonan_f32(hit_ptr.uv_coords.y);
+        //enforce_nonan_f32(hit_ptr.uv_coords.x);
+        //enforce_nonan_f32(hit_ptr.uv_coords.y);
 
         rv_store(bitcast[&mut f32](&mut hit_ptr.prim_id), lane, bitcast[f32](hit.prim_id));
         rv_store(bitcast[&mut f32](&mut hit_ptr.geom_id), lane, bitcast[f32](hit.geom_id));
@@ -395,8 +427,8 @@ fn @cpu_traverse_hybrid_helper( mut ray: Ray
                                     active = false;
                                 }
 
-                                enforce_nonan_f32(hit.uv_coords.x);
-                                enforce_nonan_f32(hit.uv_coords.y);
+                                //enforce_nonan_f32(hit.uv_coords.x);
+                                //enforce_nonan_f32(hit.uv_coords.y);
                             },
                             _ => ()
                         }
